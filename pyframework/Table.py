@@ -8,57 +8,147 @@ class Column:
     Parameters
     ----------
     table : Any
-            the table to which this column belongs
+        the table to which this column belongs
     name : str
-            the name of this column
+        the name of this column
     dtype : Any
-            the type of this column
-    reqd : bool = True
-            whether the column is required on not
+        the type of this column
+    *
+    null: bool = False
+        whether or not the column can take a null value
+    default: Any = None
+        the default value of the column if not given upon insert
+    visible: bool = True
+        whether the column is visible or not
+    increment: bool = False
+        whether or not to auto increment on each insert
+    unique: bool = False
+        whether or not the column must be unique
+    key: bool = False
+        whether or not the column is a key aka index
+    primary: bool = False
+        whether or not the column is the primary key
+        implies @unique and @key are True
+    comment: str = ''
+        a comment about the column
 
     Properties
     ----------
-    dtype : Any
-            the type of this column
-    name : str
-            the name of this column
-    nullable : bool
-            whether the column can take a null value
-    reqd : bool
-            whether this column is required
     table : Any
-            the table to which this column belongs
+        the table to which this column belongs
+    name : str
+        the name of this column
+    dtype : Any
+        the type of this column
+    null : bool
+        whether this column can take a null value
+    default: Any = None
+        the default value of the column if not given upon insert
+    visible: bool = True
+        whether the column is visible or not
+    increment: bool = False
+        whether or not to auto increment on each insert
+    unique: bool = False
+        whether or not the column must be unique
+    key: bool = False
+        whether or not the column is a key aka index
+    primary: bool = False
+        whether or not the column is the primary key
+        implies @unique and @key are True
+    comment: str = ''
+        a comment about the column
 
     Methods
     -------
     __bool__
-            if it's a comparison, returns whether the two columns are the same
-            else returns True
-
+        if it's a comparison, returns whether the two columns are the same
+        else returns True
 
     Passthrough Methods
     -------------------
     __add__, __mul__, __sub__, __truediv__
-            route to self.table.db functions for operations
-            delegated further to self.table.db.translator.[func]()
+        route to self.table.db functions for operations
+        delegated further to self.table.db.translator.[func]()
     __and__, __contains__, __eq__, __ge__, __gt__, __lt__, __le__, __mod__, __ne__, __or__
-            route to self.table.db functions for comparisons
-            delegated further to self.table.db.translator.[func]()
-
-    Class Methods
-    -------------
-    from_definition()
-            creates a column from the given definition
+        route to self.table.db functions for comparisons
+        delegated further to self.table.db.translator.[func]()
     """
 
-    def __init__(self, table: Any, name: str, dtype: Any, reqd: bool = True) -> None:
+    def __init__(
+        self,
+        table: Any,
+        name: str,
+        dtype: Any,
+        *,
+        null: bool = True,
+        default: Any = None,
+        visible: bool = True,
+        increment: bool = False,
+        unique: bool = False,
+        key: bool = False,
+        primary: bool = False,
+        comment: str = "",
+    ) -> None:
         self._table = table
         self._name = name
         self._dtype = dtype
-        self._reqd = reqd
+        self._null = True if null else False
+        self._default = default
+        self._visible = True if visible else False
+        self._increment = True if increment else False
+        self._unique = True if unique or primary else False
+        self._key = True if key or primary else False
+        self._primary = True if primary else False
+        self._comment = comment
+
+    @classmethod
+    def from_definition(cls, definition: str, *, table: Any = None) -> "Column":
+        """
+
+        Parameters
+        ----------
+        definition : str
+            the definition of the column in the form (case INsensitive)
+            "name dtype [[NOT] NULL] [DEFAULT value] [[IN]VISIBLE] [[AUTO_]INCREMENT]
+                [UNIQUE [KEY]] [[PRIMARY] KEY] [COMMENT value]"
+        *
+        table: Any = None
+            the table of the column
+        """
+        kwargs = {"table": table}
+
+        kwargs["name"], kwargs["dtype"], *lower_def = definition.lower().split()
+        kwargs["null"] = "not" not in lower_def if "null" in lower_def else False
+
+        if "default" in lower_def:
+            start = lower_def.index("default") + 1  # one for name, one to get following
+            end = start + 1
+            while end < len(lower_def) and lower_def[end] not in [
+                "visible",
+                "invisible",
+                "auto_increment",
+                "increment",
+                "unique",
+                "key",
+                "comment",
+            ]:
+                end += 1
+            kwargs["default"] = " ".join(definition.split()[start + 2 : end + 2])
+
+        kwargs["visible"] = "visible" in lower_def or "invisible" not in lower_def
+        kwargs["increment"] = "auto_increment" in lower_def or "increment" in lower_def
+        kwargs["unique"] = "unique" in lower_def
+        kwargs["key"] = "key" in lower_def
+        kwargs["primary"] = "primary" in lower_def
+
+        if "comment" in lower_def:
+            start = lower_def.index("comment") + 1
+            kwargs["comment"] = " ".join(definition.split()[start + 2 :])
+
+        return cls(**kwargs)
 
     def __repr__(self) -> str:
-        """Makes a str represntation of self for queries"""
+        """Makes a str representation of self for queries"""
         return (
             f"{self.table.name}.{self.name}"
             if hasattr(self.table, "name")
@@ -70,6 +160,19 @@ class Column:
         return f"{self.name} {self.dtype!s}"
 
     @property
+    def table(self) -> Any:
+        """
+        The Table this column is attached to
+        Can be None if passed explicitly during creation
+        """
+        return self._table
+
+    @property
+    def name(self) -> str:
+        """Returns the name of the column"""
+        return self._name
+
+    @property
     def dtype(self) -> Any:
         """
         Returns the type of the column
@@ -78,37 +181,54 @@ class Column:
         Special values
         --------------
         'comparison'
-                the result of using comparison methods on two columns
+            the result of using comparison methods on two columns
         'operation'
-                the result of using operation methods on a column
+            the result of using operation methods on a column
         """
         return self._dtype
 
     @property
-    def name(self) -> str:
-        """Returns the name of the column"""
-        return self._name
+    def null(self) -> bool:
+        """Returns whether or not the column can take a null value"""
+        return self._null
 
     @property
-    def nullable(self) -> bool:
-        """
-        Returns whether the column can take a null value
-        Calculated as not self.reqd
-        """
-        return not self.reqd
+    def default(self) -> Any:
+        """The default value of the column if not given upon insert"""
+        return self._default
 
     @property
-    def reqd(self) -> bool:
-        """Returns whether the column is required or not"""
-        return self._reqd
+    def visible(self) -> bool:
+        """Returns whether or not this column is visible in its parent table"""
+        return self._visible
 
     @property
-    def table(self) -> Any:
+    def increment(self) -> bool:
+        """Returns whether or not this column auto increments"""
+        return self._increment
+
+    @property
+    def unique(self) -> bool:
+        """Returns whether or not the column must only contain unique entries"""
+        return self._unique
+
+    @property
+    def key(self) -> bool:
+        """Returns whether or not this column is a key aka index"""
+        return self._key
+
+    @property
+    def primary(self) -> bool:
         """
-        The Table this column is attached to
-        Can be None if passed explicitly during creation
+        Returns whether or not the column is the primary key of the table
+        Implies both self.key and self.unique are True
         """
-        return self._table
+        return self._primary
+
+    @property
+    def comment(self) -> str:
+        """Returns the comment on this column"""
+        return self._comment
 
     def __bool__(self) -> bool:
         # handle comparisons by doing a comparison
@@ -128,9 +248,10 @@ class Column:
                     a, b = b, a
 
                 # handle table names
-                if b.count(".") == 1:
-                    current = (a.table == b.split(".")[0]) and (
-                        a.name == b.split(".")[1].rsplit(" ", 1)[0]
+                # be ready in case of space
+                if b.split(" ")[0].count(".") == 1:
+                    current = (a.table == b.split(" ")[0].split(".")[0]) and (
+                        a.name == b.split(" ")[0].split(".")[1].rsplit(" ", 1)[0]
                     )  # rsplit in case of type
                 else:
                     current = a.name == b
@@ -153,18 +274,8 @@ class Column:
         else:
             return True
 
-    @classmethod
-    def from_definition(cls, definition) -> "Column":
-        """Generator for a given defintion in the form '[table.]name[ with spaces] type' """
-        name, dtype = definition.rsplit(" ", 1)
-        if name.count(".") == 1:
-            table, name = name.split(".")
-        else:
-            table = None
-        return cls(table, name, dtype)
-
     def __add__(self, a):
-        if hasattr(self.table, "db") and hasattr(self.self.table.db, "add"):
+        if hasattr(self.table, "db") and hasattr(self.table.db, "add"):
             return self.table.db.add(self, a)
         else:
             raise NotImplementedError()
@@ -255,51 +366,78 @@ class Table:
     Parameters
     ----------
     db : Any
-            the database to which this table belongs
+        the database to which this table belongs
     name : str
-            the name of the table itself
-    columns : Iterable[Any]
-            the column that belong to this table
-            if column._table exists, sets it to the new table
+        the name of the table itself
+    columns : Iterable[Columns]
+        the column that belong to this table
+        if column._table exists, sets it to the new table
+    *
+    temporary: bool = False
+        whether or not this a temporary table
+    increment: int = None
+        the initial value for auto incrementating
+    comment: str = ''
+        a comment about the table
+
 
     Properties
     ----------
-    columns : Iterable[Any]
-            the column that belong to this table
-            if column._table exists, sets it to the new table
-    column_names : List[str]
-            returns a list of the names of the columns
     db : Any
-            the database to which this table belongs
+        the database to which this table belongs
     name : str
-            the name of the table itself
+        the name of the table itself
+    columns : Iterable[Columns]
+        the column that belong to this table
+        if column._table exists, sets it to the new table
+    column_names : List[str]
+        returns a list of the names of the columns
+    temporary: bool = False
+        whether or not this a temporary table
+    increment: int = None
+        the initial value for auto incrementating
+    comment: str = ''
+        a comment about the table
 
     Methods
     --------
     count()
-            returns the count of the entries
+        returns the count of the entries
     delete()
-            deletes the entries
+        deletes the entries
     distinct()
-            returns distinct values of the entries
+        returns distinct values of the entries
     insert()
-            inserts entries
+        inserts entries
     join(table, on, alias, direction) - returns a Table that allows for querying on the inner/left/
-            right joined with @table aliased as @alias on @on
+        right joined with @table aliased as @alias on @on
     select()
-            returns the entries
+        returns the entries
     update()
-            update the entries
+        update the entries
     """
 
-    def __init__(self, db: Any, name: str, columns: Iterable[Any]) -> None:
+    def __init__(
+        self,
+        db: Any,
+        name: str,
+        columns: Iterable[Column],
+        *,
+        temporary: bool = False,
+        increment: int = None,
+        comment: str = "",
+    ) -> None:
         self._db = db
         self._name = name
         self._columns = columns
+        self._temporary = True if temporary else False
+        self._increment = increment
+        self._comment = comment
 
         for c in self.columns:
-            if hasattr(c, "_table"):
-                c._table = self
+            c._table = self
+            if c.visible:
+                setattr(self, c.name, c)
 
     def __repr__(self) -> str:
         return f"{self.name!r}" if "join" not in self.name else self.name
@@ -307,16 +445,6 @@ class Table:
     def __str__(self) -> str:
         """Makes a str representation of self to display."""
         return f"Table {self.name}: " + ", ".join([str(c) for c in self.columns])
-
-    @property
-    def columns(self) -> Iterable[Any]:
-        """The columns of this table"""
-        return self._columns
-
-    @property
-    def column_names(self) -> List[str]:
-        """A list of the column names"""
-        return [i.name if hasattr(i, "name") else str(i) for i in self.columns]
 
     @property
     def db(self) -> Any:
@@ -328,23 +456,45 @@ class Table:
         """The name of the table itself"""
         return self._name
 
+    @property
+    def columns(self) -> Iterable[Column]:
+        """The columns of this table"""
+        return self._columns
+
+    @property
+    def column_names(self) -> List[str]:
+        """A list of the column names"""
+        return [i.name if hasattr(i, "name") else str(i) for i in self.columns]
+
+    @property
+    def temporary(self) -> bool:
+        """Returns whether or not this table is temporary"""
+        return self._temporary
+
+    @property
+    def increment(self) -> Any:
+        """The initial value for auto incrementing"""
+        return self._increment
+
+    @property
+    def comment(self) -> str:
+        """A comment about the table"""
+        return self._comment
+
     def get_column(self, col: Any) -> Any:
         """
         Returns the given col if it's in self.columns or col : str in self.column_names
         Otherwise None
         """
-        if col in self.columns:
-            print("self.columns", col, self.columns, col in self.columns)
+        if isinstance(col, Column) and col in self.columns:
             return col
         elif isinstance(col, str) and col in self.column_names:
-            print("self.column_names")
             return self.columns[self.column_names.index(col)]
         elif (
             isinstance(col, str)
             and self.name in col
             and col.replace(self.name, "").strip(".") in self.column_names
         ):
-            print("split self.column_names")
             return self.columns[
                 self.column_names.index(col.replace(self.name, "").strip("."))
             ]

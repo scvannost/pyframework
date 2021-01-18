@@ -14,69 +14,69 @@ class AbstractDatabase(abc.ABC):
     Parameters
     ----------
     location : str
-            the location of the server
+        the location of the server
     user : str
-            the username
+        the username
     password : str
-            the password for @user
+        the password for @user
     name : str
-            the name of the database to use
+        the name of the database to use
     Translator : Type[AbstractTranslator] = AbstractDatabase
-            the Translator type for this database
+        the Translator type for this database
     **kwargs
-            ignored gracefully
+        ignored gracefully
 
     Properties
     ----------
     db : Any
-            the actual database object
+        the actual database object
     open : bool
-            whether or not the database connection is open
+        whether or not the database connection is open
     tables : List[Any]
-            a Table object for each table in the database
+        a Table object for each table in the database
     table_names List[str]
-            an list of the names of all the tables
+        an list of the names of all the tables
     translator : AbstractTranslator
-            a Translator for the particular syntax of the database object
+        a Translator for the particular syntax of the database object
 
     Methods
     -------
     close()
-            closes the connection to the database
+        closes the connection to the database
     *connect()
-            connects to the database
+        connects to the database
     *db_query(q, limit, kwargs)
-            queries the database for q
-            additional kwargs ['maxrows', 'how'] passed to self.db.fetch_row
+        queries the database for q
+        additional kwargs ['maxrows', 'how'] passed to self.db.fetch_row
     get_column()
-            gets the given column gracefully
+        gets the given column gracefully
     get_table()
-            gets the given table gracefully
+        gets the given table gracefully
     interpret()
-            takes the response from self.db_query and turns it into the desired python types
+        takes the response from self.db_query and turns it into the desired python types
     is_valid_column()
-            checks if column would be valid
+        checks if column would be valid
     prepare()
-            route to self.translator.prepare
+        route to self.translator.prepare
     query(method, table, fields, extra, kwargs)
-            provides API for querying the database using self.prepare and self.translate and self.interpret
+        provides API for querying the database using self.prepare and self.translate and self.interpret
     rollback()
-            rolls back changes to the database
+        rolls back changes to the database
     reconnect()
-            same as calling close() then open()
+        same as calling close() then open()
     translate()
-            route to self.translator.translate
+        route to self.translator.translate
     validate()
-            route to self.translator.validate
+        route to self.translator.validate
     validate_and_raise()
-            route to self.translator.validate_and_raise
+        route to self.translator.validate_and_raise
 
     Passthrough Methods
     -------------------
     add(), div(), mul(), sub()
-            route to self.translator.[func]()
+        route to self.translator.[func]()
     contains(), eq(), ge(), gt(), like(), logical_and(), logical_or(), lt(), le(), ne()
-            route to self.translator.[func]()
+        route to self.translator.[func]()
     """
 
     def __init__(
@@ -162,15 +162,15 @@ class AbstractDatabase(abc.ABC):
         ----------
         table : Any
         column : Any
-                the table and column to look for
+            the table and column to look for
 
         Returns
         -------
         None
-                if self.get_table(table) returns None
-                if found table doesn't hasattr "get_column"
+            if self.get_table(table) returns None
+            if found table doesn't hasattr "get_column"
         Any
-                self.get_table(table).get_column(column)
+            self.get_table(table).get_column(column)
         """
         table = self.get_table(table)
         if table is None or not hasattr(table, "get_column"):
@@ -185,17 +185,17 @@ class AbstractDatabase(abc.ABC):
         Parameters
         ----------
         table : Any
-                the table to look for
+            the table to look for
 
         Returns
         -------
         None
-                if table not in self.tables and table.db is not self
-                if table : str not in self.table_names
+            if table not in self.tables and table.db is not self
+            if table : str not in self.table_names
         @table
-                if not in self.tables but hasattr "db" and table.db is self
+            if not in self.tables but hasattr "db" and table.db is self
         Any
-                the table from self.tables
+            the table from self.tables
         """
         if table in self.tables or (hasattr(table, "db") and table.db == self):
             return table
@@ -219,17 +219,17 @@ class AbstractDatabase(abc.ABC):
         ----------
         table : Any
         column : Any
-                the table / column to validate
+            the table / column to validate
         find_table : bool = True
-                whether to pass @table through self.get_table
-                set to False if the table is not in this database
+            whether to pass @table through self.get_table
+            set to False if the table is not in this database
 
         Returns
         -------
         False
-                if @table is None, after self.get_talbe if @find_table
+            if @table is None, after self.get_talbe if @find_table
         bool
-                self.translator.is_valid_column(table, column)
+            self.translator.is_valid_column(table, column)
         """
         if find_table:
             table = self.get_table(table)
@@ -331,33 +331,33 @@ class AbstractTranslator(abc.ABC):
     Parameters
     ----------
     db
-            the Database this translator is used for
+        the Database this translator is used for
     *args, **kwargs
-            all silently ignored
-            for convenience in subclassing
+        all silently ignored
+        for convenience in subclassing
 
     Properties
     ----------
     db : Database
-            the Database given upon init
+        the Database given upon init
     *dtypes : list(str)
-            the acceptable types for this database
+        the acceptable types for this database
     *NULL : str
-            the database command for the null value
+        the database command for the null value
 
     Methods
     -------
     *escape_string()
-            returns a database-safe version of a string
+        returns a database-safe version of a string
     *interpret(results, *args, **kwargs)
-            takes results of self.db.db_query and marshalls them into desired returns
+        takes results of self.db.db_query and marshalls them into desired returns
     *translate(*args, **kwargs)
-            turns the given call into the direct query for self.db.db_query
+        turns the given call into the direct query for self.db.db_query
     validate(*args, **kwargs)
-            returns bool of if given call passes validation or not
-            calls self.validate_and_raise(*args, **kwargs)
+        returns bool of if given call passes validation or not
+        calls self.validate_and_raise(*args, **kwargs)
     *validate_and_raise(*args, **kwargs)
-            raises any errors found invalidating the call
+        raises any errors found invalidating the call
 
 
     Additional Methods
@@ -439,14 +439,14 @@ class AbstractTranslator(abc.ABC):
         Parameters
         ----------
         args : tuple
-                the args from self.validate, after validation and modification
+            the args from self.validate, after validation and modification
         kwargs : dict
-                the kwargs from self.validate, after validation and modification
+            the kwargs from self.validate, after validation and modification
 
         Returns
         -------
         str
-                the query ready to pass to self.db.db_query
+            the query ready to pass to self.db.db_query
         """
         pass
 
@@ -457,9 +457,9 @@ class AbstractTranslator(abc.ABC):
         Parameters
         -------
         args : tuple
-                the raw args for processing to give to self.translate
+            the raw args for processing to give to self.translate
         kwargs : dict
-                the raw kwargs for processing to give to self.translate and self.db_query
+            the raw kwargs for processing to give to self.translate and self.db_query
 
         Returns
         -------
@@ -468,7 +468,7 @@ class AbstractTranslator(abc.ABC):
         Raises
         ------
         Exception
-                if the given args, kwargs cannot be validated
+            if the given args, kwargs cannot be validated
         """
         pass
 
@@ -479,15 +479,15 @@ class AbstractTranslator(abc.ABC):
         Parameters
         ----------
         args : tuple
-                the raw args for processing to give to self.translate
+            the raw args for processing to give to self.translate
         kwargs : dict
-                the raw kwargs for processing to give to self.translate and self.db_query
+            the raw kwargs for processing to give to self.translate and self.db_query
 
         Returns
         -------
         bool
-                True if args, kwargs do not raise any errors in class.prepare_and_raise
-                False if class.prepare_and_raise throws an error during validation
+            True if args, kwargs do not raise any errors in class.prepare_and_raise
+            False if class.prepare_and_raise throws an error during validation
 
         Raises
         ------
@@ -564,89 +564,89 @@ class AbstractSqlDatabase(AbstractDatabase):
     Parameters
     ----------
     location : str
-            the location of the server
+        the location of the server
     user : str
-            the username
+        the username
     password : str
-            the password for @user
+        the password for @user
     name : str
-            the name of the database to use
+        the name of the database to use
     Translator : Type[AbstractTranslator] = AbstractDatabase
-            the Translator type for this database
+        the Translator type for this database
     **kwargs
-            passed to super().__init__()
-            ignored gracefully
+        passed to super().__init__()
+        ignored gracefully
 
     Properties
     ----------
     db : Any
-            the actual database object
+        the actual database object
     open : bool
-            whether or not the database connection is open
+        whether or not the database connection is open
     tables : List[Table]
-            a Table object for each table in the database
+        a Table object for each table in the database
     table_names List[str]
-            an list of the names of all the tables
+        an list of the names of all the tables
     translator : AbstractTranslator
-            a Translator for the particular syntax of the database object
+        a Translator for the particular syntax of the database object
 
     Methods
     -------
     close()
-            closes the connection to the database
+        closes the connection to the database
     *connect()
-            connects to the database
+        connects to the database
     commit()
-            commits changes to the database
+        commits changes to the database
     *db_query(q, limit, kwargs)
-            queries the database for q
-            additional kwargs ['maxrows', 'how'] passed to self.db.fetch_row
+        queries the database for q
+        additional kwargs ['maxrows', 'how'] passed to self.db.fetch_row
     get_column()
-            gets the given column gracefully
+        gets the given column gracefully
     get_table()
-            gets the given table gracefully
+        gets the given table gracefully
     interpret()
-            takes the response from self.db_query and turns it into the desired python types
+        takes the response from self.db_query and turns it into the desired python types
     is_valid_column()
-            checks if column would be valid
+        checks if column would be valid
     prepare()
-            route to self.translator.prepare
+        route to self.translator.prepare
     query(method, table, fields, extra, kwargs)
-            provides API for querying the database using self.prepare and self.translate and self.interpret
+        provides API for querying the database using self.prepare and self.translate and self.interpret
     rollback()
-            rolls back changes to the database
+        rolls back changes to the database
     reconnect()
-            same as calling close() then open()
+        same as calling close() then open()
     translate()
-            route to self.translator.translate
+        route to self.translator.translate
     validate()
-            route to self.translator.validate
+        route to self.translator.validate
     validate_and_raise()
-            route to self.translator.validate_and_raise
+        route to self.translator.validate_and_raise
 
     Additional Methods
     ------------------
     add_column()
-            add the given column to the given table
+        add the given column to the given table
     alter_column()
-            alter the given column in the given table
-    drop_column()
-            drop the given column from the given table
+        alter the given column in the given table
+    drop_ column()
+        drop the given column from the given table
     drop_table()
-            drop the given table; temp to only drop TEMPORARY tables
+        drop the given table; temporary to only drop TEMPORARY tables
     make_table()
-            makes a new table with the given name and fields; clobber to overwrite existing table
+        makes a new table with the given name and fields; clobber to overwrite existing table
     move_table()
-            renames the given table to the given name
+        renames the given table to the given name
     truncate_table()
-            truncates the given table
+        truncates the given table
 
     Passthrough Methods
     -------------------
     add(), div(), mul(), sub()
-            route to self.translator.[func]()
+        route to self.translator.[func]()
     contains(), eq(), ge(), gt(), like(), logical_and(), logical_or(), lt(), le(), ne()
-            route to self.translator.[func]()
+        route to self.translator.[func]()
     """
 
     def __init__(
@@ -668,17 +668,17 @@ class AbstractSqlDatabase(AbstractDatabase):
         Parameters
         ----------
         table : str, Table
-                the table to alter
+            the table to alter
         new : str, Column
-                the new column to add
+            the new column to add
         after : str, Column
-                the column after which to add the new column
-                special value: 'first'
+            the column after which to add the new column
+            special value: 'first'
 
         Returns
         -------
         Table
-                the new table that was created
+            the new table that was created
         """
         if not self.open:
             raise Exception("You must initiate the connection.")
@@ -711,14 +711,14 @@ class AbstractSqlDatabase(AbstractDatabase):
         ----------
         table: str, Table
         old : str, Column
-                the the table / column to alter
+            the the table / column to alter
         new : str, Column
-                the desired column definition
+            the desired column definition
 
         Returns
         -------
         Table
-                the table that contains the new column
+            the table that contains the new column
         """
         if not self.open:
             raise Exception("You must initiate the connection.")
@@ -757,19 +757,19 @@ class AbstractSqlDatabase(AbstractDatabase):
         Parameters
         ----------
         q : str
-                the SQL query, ending in ';'
-                no validation is done for correctness
+            the SQL query, ending in ';'
+            no validation is done for correctness
         limit : int = -1
-                is the number of results to return
-                If < 0, special value for all
+            is the number of results to return
+            If < 0, special value for all
 
         Returns
         -------
         Any
-                the results of the query
-                default type List[Dict[str, Any]]
+            the results of the query
+            default type List[Dict[str, Any]]
         None
-                if no result, such as for update, delete, etc
+            if no result, such as for update, delete, etc
         """
         pass
 
@@ -810,7 +810,7 @@ class AbstractSqlDatabase(AbstractDatabase):
         return self.get_table(table)
 
     def drop_table(
-        self, table: Union[str, Table], temp: bool = False
+        self, table: Union[str, Table], temporary: bool = False
     ) -> "AbstractSqlDatabase":
         """
         Drops the given table
@@ -818,7 +818,7 @@ class AbstractSqlDatabase(AbstractDatabase):
         Parameters
         ----------
         tabl @name is the table to drop
-        bool @temp to specify only drop TEMPORARY tables; default False
+        bool @temporary to specify only drop TEMPORARY tables; default False
 
         Returns
         -------
@@ -827,7 +827,7 @@ class AbstractSqlDatabase(AbstractDatabase):
         if not self.open:
             raise Exception("You must initiate the connection.")
 
-        self.query("drop table", table, temp=temp)
+        self.query("drop table", table, temporary=temporary)
 
         if isinstance(table, Table):
             del self._tables[self.tables.index(table)]
@@ -853,7 +853,7 @@ class AbstractSqlDatabase(AbstractDatabase):
         self,
         table: Union[str, Table],
         columns: Union[str, Column, Mapping[str, str], Iterable[Union[str, Column]]],
-        temp: bool = False,
+        temporary: bool = False,
         clobber: bool = False,
     ) -> Table:
         """
@@ -863,10 +863,10 @@ class AbstractSqlDatabase(AbstractDatabase):
         ----------
         tbl @table is the name of the table
         @columns can be:
-                str as comma-separated column definitions;
-                Iterable[str] as columns definitions; or
-                Mapping[str, str] as {field: definition}
-        bool @temp to make a temporary table
+            str as comma-separated column definitions;
+            Iterable[str] as columns definitions; or
+            Mapping[str, str] as {field: definition}
+        bool @temporary to make a temporary table
         bool @clobber to overwrite an existing table; default False
 
         Returns
@@ -879,9 +879,11 @@ class AbstractSqlDatabase(AbstractDatabase):
             raise Exception("You must initiate the connection.")
 
         # create the table
-        self.query("create table", table, columns, temp=temp, clobber=clobber)
+        self.query("create table", table, columns, temporary=temporary, clobber=clobber)
         columns = self.query("describe", table)
-        columns = [Column.from_definition(c) for c in columns[0].split(", ")]
+        columns = [
+            Column.from_definition(c, table=table) for c in columns[0].split(", ")
+        ]
 
         # make the Table and return it
         if isinstance(table, Table):
@@ -960,24 +962,24 @@ class AbstractSqlDatabase(AbstractDatabase):
         Parameters
         ----------
         str @method is the SQL method argument. Use 'distinct' for `select distinct`
-                Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show tables', 'describe',
-                                   'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                                   'rename table', 'truncate [table]', 'add/create column', 'drop column'
+            Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show tables', 'describe',
+                       'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column'
         str @table is the table name or the Table itself
                 For @method = 'create table', must not be a Table or table name in this database
                 Otherwise, must be a Table in self.tables or a str in self.table_names
         obj @fields
-                Not required for @method in ['count', 'delete', 'show tables', 'describe', 'drop table', 'truncate']
-                Not required for @method = 'create table' if @table is a Table
-                Must be a Mapping of {field: value} for method in ['insert', 'update']
-                Must be a str, Iterable(col) for method = 'create table' if @table is not a Table
-                Must be a str for method = 'rename table'
-                Must be str or Column for method in ['add column', 'drop column']
-                Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
-                Must be a Iterable(col) or col or 'all' otherwise
+            Not required for @method in ['count', 'delete', 'show tables', 'describe', 'drop table', 'truncate']
+            Not required for @method = 'create table' if @table is a Table
+            Must be a Mapping of {field: value} for method in ['insert', 'update']
+            Must be a str, Iterable(col) for method = 'create table' if @table is not a Table
+            Must be a str for method = 'rename table'
+            Must be str or Column for method in ['add column', 'drop column']
+            Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
+            Must be a Iterable(col) or col or 'all' otherwise
         *
         col @where
-                a Column with dtype in 'comparison', generated from performing a comparison on a Column
+            Column with dtype in 'comparison', generated from performing a comparison on a Column
         int @limit
         col @groupby
         col @orderby
@@ -986,24 +988,24 @@ class AbstractSqlDatabase(AbstractDatabase):
         Returns
         -------
         Any
-                if method has a return
+            if method has a return
 
         Additional kwargs
         -----------------
-        temp : bool = False
-                for @method in ['create table', 'drop table']
-                whether or not the table is a temporary table
+        temporary : bool = False
+            for @method in ['create table', 'drop table']
+            whether or not the table is a temporary table
         clobber : bool = False
-                for @method='create table'
-                whether or not to overwrite the table if it already exists
+            for @method='create table'
+            whether or not to overwrite the table if it already exists
         after : col
-                for @method='add column'
-                the column in @tbl after which to add the given column
-                use special value "first" to add the column as the first in the table
+            for @method='add column'
+            the column in @tbl after which to add the given column
+            use special value "first" to add the column as the first in the table
         to : col
-                for @method in ['alter column', 'rename table']
-                the new column specification for the column
-                only needed if @fields is not Mapping
+            for @method in ['alter column', 'rename table']
+            the new column specification for the column
+            only needed if @fields is not Mapping
         all additional kwargs passed through to self.[prepare / translate / db_query]
         """
         self.validate_and_raise(
@@ -1078,42 +1080,42 @@ class AbstractSqlTranslator(AbstractTranslator):
     Parameters
     ----------
     db
-            the Database this translator is used for
+        the Database this translator is used for
     *args, **kwargs
-            all silently ignored
-            for convenience in subclassing
+        all silently ignored
+        for convenience in subclassing
 
     Properties
     ----------
     db : Database
-            the Database given upon init
+        the Database given upon init
     *dtypes : list(str)
-            the acceptable types for this database
+        the acceptable types for this database
     *NULL : str
-            the database command for the null value
+        the database command for the null value
 
     Methods
     -------
     *escape_string()
-            returns a database-safe version of a string
+        returns a database-safe version of a string
     *interpret(results, *args, **kwargs)
-            takes results of self.db.db_query and marshalls them into desired returns
+        takes results of self.db.db_query and marshalls them into desired returns
     *translate(*args, **kwargs)
-            turns the given call into the direct query for self.db.db_query
+        turns the given call into the direct query for self.db.db_query
     validate(*args, **kwargs)
-            returns bool of if given call passes validation or not
-            calls self.validate_and_raise(*args, **kwargs)
+        returns bool of if given call passes validation or not
+        calls self.validate_and_raise(*args, **kwargs)
     *validate_and_raise(*args, **kwargs)
-            raises any errors found invalidating the call
+        raises any errors found invalidating the call
 
     Additional Methods
     ------------------
     add(), div(), mul(), sub()
-            returns default implementations of operations
+        returns default implementations of operations
     contains(), eq(), ge(), gt(), like(), logical_and(), logical_or(), lt(), le(), ne()
-            returns default implementations of comparisons
+        returns default implementations of comparisons
     *groupby(), *join(), *limit(), *orderby(), *where()
-            returns a string representing the substatement given
+        returns a string representing the substatement given
     """
 
     # Return Column( db : Column, name : str, dtype : str in ['operation', 'comparison'])

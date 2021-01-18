@@ -16,93 +16,93 @@ class AbstractMySqlDatabase(AbstractSqlDatabase):
     Parameters
     ----------
     location : str
-            the location of the server
+        the location of the server
     user : str
-            the username
+        the username
     password : str
-            the password for @user
+        the password for @user
     name : str
-            the name of the database to use
+        the name of the database to use
     Translator : Type[AbstractTranslator] = AbstractMySqlTranslator
-            the Translator type for this database
+        the Translator type for this database
     **kwargs
-            passed to super().__init__()
-            ignored gracefully
+        passed to super().__init__()
+        ignored gracefully
 
     Properties
     ----------
     db : Any
-            the actual database object
+        the actual database object
     open : bool
-            whether or not the database connection is open
+        whether or not the database connection is open
     tables : List[Table]
-            a Table object for each table in the database
+        a Table object for each table in the database
     table_names List[str]
-            an list of the names of all the tables
+        an list of the names of all the tables
     translator : AbstractTranslator
-            a Translator for the particular syntax of the database object
+        a Translator for the particular syntax of the database object
 
     Methods
     -------
     close()
-            closes the connection to the database
+        closes the connection to the database
     *connect()
-            connects to the database
+        connects to the database
     commit()
-            commits changes to the database
+        commits changes to the database
     *db_query(q, limit, kwargs)
-            queries the database for q
-            additional kwargs ['maxrows', 'how'] passed to self.db.fetch_row
+        queries the database for q
+        additional kwargs ['maxrows', 'how'] passed to self.db.fetch_row
     get_table()
-            gets the given table gracefully
+        gets the given table gracefully
     get_column()
-            gets the given column gracefully
+        gets the given column gracefully
     interpret()
-            takes the response from self.db_query and turns it into the desired python types
+        takes the response from self.db_query and turns it into the desired python types
     is_valid_column()
-            checks if column would be valid
+        checks if column would be valid
     prepare()
-            route to self.translator.prepare
+        route to self.translator.prepare
     query(method, table, fields, extra, kwargs)
-            provides API for querying the database using self.prepare and self.translate and self.interpret
+        provides API for querying the database using self.prepare and self.translate and self.interpret
     rollback()
-            rolls back changes to the database
+        rolls back changes to the database
     reconnect()
-            same as calling close() then open()
+        same as calling close() then open()
     translate()
-            route to self.translator.translate
+        route to self.translator.translate
     validate()
-            route to self.translator.validate
+        route to self.translator.validate
     validate_and_raise()
-            route to self.translator.validate_and_raise
+        route to self.translator.validate_and_raise
 
     Additional Methods
     ------------------
     add_column()
-            add the given column to the given table
+        add the given column to the given table
     add_fk()
-            creates a foreign key between table(field) and ref
+        creates a foreign key between table(field) and ref
     alter_column()
-            alter the given column in the given table
+        alter the given column in the given table
     drop_column()
-            drop the given column from the given table
+        drop the given column from the given table
     drop_fk()
-            drops the named foreign key on the given table
+        drops the named foreign key on the given table
     drop_table()
-            drop the given table; temp to only drop TEMPORARY tables
+        drop the given table; temporary to only drop TEMPORARY tables
     make_table()
-            makes a new table with the given name and fields; clobber to overwrite existing table
+        makes a new table with the given name and fields; clobber to overwrite existing table
     move_table()
-            renames the given table to the given name
+        renames the given table to the given name
     truncate_table()
-            truncates the given table
+        truncates the given table
 
     Passthrough Methods
     -------------------
     add(), div(), mul(), sub()
-            route to self.translator.[func]()
+        route to self.translator.[func]()
     contains(), eq(), ge(), gt(), like(), logical_and(), logical_or(), lt(), le(), ne()
-            route to self.translator.[func]()
+        route to self.translator.[func]()
     """
 
     def __init__(
@@ -121,14 +121,14 @@ class AbstractMySqlDatabase(AbstractSqlDatabase):
         Parameters
         ----------
         name : str
-                the name of the fk
+            the name of the fk
         table : str
-                the name of the table
+            the name of the table
         field : str
-                the name of the column
+            the name of the column
         ref : str
-                the table and column that is the key
-                in the form: `table`(`col`)
+            the table and column that is the key
+            in the form: `table`(`col`)
 
         Returns
         -------
@@ -149,9 +149,9 @@ class AbstractMySqlDatabase(AbstractSqlDatabase):
         Parameters
         ----------
         name : str
-                the name of the fk
+            the name of the fk
         table : str
-                the name of the table
+            the name of the table
 
         Returns
         -------
@@ -172,42 +172,42 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
     Parameters
     ----------
     db
-            the Database this translator is used for
+        the Database this translator is used for
     *args, **kwargs
-            all silently ignored
-            for convenience in subclassing
+        all silently ignored
+        for convenience in subclassing
 
     Properties
     ----------
     db : Database
-            the Database given upon init
+        the Database given upon init
     dtypes : list(str)
-            the acceptable types for this database
+        the acceptable types for this database
     NULL : str
-            the database command for the null value
+        the database command for the null value
 
     Methods
     -------
     *escape_string()
-            returns a database-safe version of a string
+        returns a database-safe version of a string
     *interpret(results, *args, **kwargs)
-            takes results of self.db.db_query and marshalls them into desired returns
+        takes results of self.db.db_query and marshalls them into desired returns
     translate(*args, **kwargs)
-            turns the given call into the direct query for self.db.db_query
+        turns the given call into the direct query for self.db.db_query
     validate(*args, **kwargs)
-            returns bool of if given call passes validation or not
-            calls self.validate_and_raise(*args, **kwargs)
+        returns bool of if given call passes validation or not
+        calls self.validate_and_raise(*args, **kwargs)
     validate_and_raise(*args, **kwargs)
-            raises any errors found invalidating the call
+        raises any errors found invalidating the call
 
     Additional methods
     ------------------
     add(), div(), mul(), sub()
-            returns a string representing the operation given
+        returns a string representing the operation given
     contains(), eq(), ge(), gt(), like(), logical_and(), logical_or(), lt(), le(), ne()
-            returns a string representing the comparison given
+        returns a string representing the comparison given
     groupby(), join(), limit(), orderby(), where()
-            returns a string representing the substatement given
+        returns a string representing the substatement given
     """
 
     @property
@@ -228,22 +228,22 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         Parameters
         ----------
         results : Any
-                the results of the call defined by the rest of the parameters
+            the results of the call defined by the rest of the parameters
         str @method is the SQL method argument. Use 'distinct' for `select distinct`
-                Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
-                                   'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                                   'rename table', 'truncate [table]', 'add/create column', 'drop column'
+            Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
+                       'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column'
 
         Returns
         -------
         int
-                for method == 'count'
+            for method == 'count'
         List[str]
-                for method in ['show tables', 'describe']
+            for method in ['show tables', 'describe']
         List[Union[Tuple[Any], Dict[str, Any]]]
-                for method in ['select', 'distinct']
+            for method in ['select', 'distinct']
         None
-                otherwise
+            otherwise
         """
         pass
 
@@ -274,25 +274,25 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         Parameters
         ----------
         str @method is the SQL method argument. Use 'distinct' for `select distinct`
-                Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
-                                   'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                                   'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column'
+            Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
+                       'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column'
         str @table is the table name or the Table itself
-                For @method = 'create table', must not be a Table or table name in this database
-                Otherwise, must be a Table in self.tables or a str in self.table_names
+            For @method = 'create table', must not be a Table or table name in this database
+            Otherwise, must be a Table in self.tables or a str in self.table_names
         obj @fields
-                Not required for @method in ['count', 'delete', 'describe', 'drop table', 'truncate']
-                Not required for @method = 'create table' if @table is a Table
-                'show' for @method='tables'
-                Must be a Mapping of {field: value} for method in ['insert', 'update']
-                Must be a str, Iterable(col) for method = 'create table' if @table is not a Table
-                Must be a str for method = 'rename table'
-                Must be str or Column for method in ['add column', 'drop column']
-                Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
-                Must be a Iterable(col) or col or 'all' otherwise
+            Not required for @method in ['count', 'delete', 'describe', 'drop table', 'truncate']
+            Not required for @method = 'create table' if @table is a Table
+            'show' for @method='tables'
+            Must be a Mapping of {field: value} for method in ['insert', 'update']
+            Must be a str, Iterable(col) for method = 'create table' if @table is not a Table
+            Must be a str for method = 'rename table'
+            Must be str or Column for method in ['add column', 'drop column']
+            Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
+            Must be a Iterable(col) or col or 'all' otherwise
         *
         col @where
-                a Column with dtype in 'comparison', generated from performing a comparison on a Column
+            a Column with dtype in 'comparison', generated from performing a comparison on a Column
         int @limit
         col @groupby
         col @orderby
@@ -300,20 +300,20 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
 
         Additional kwargs
         -----------------
-        temp : bool = False
-                for @method in ['create table', 'drop table']
-                whether or not the table is a temporary table
+        temporary : bool = False
+            for @method in ['create table', 'drop table']
+            whether or not the table is a temporary table
         clobber : bool = False
-                for @method='create table'
-                whether or not to overwrite the table if it already exists
+            for @method='create table'
+            whether or not to overwrite the table if it already exists
         after : col
-                for @method='add column'
-                the column in @tbl after which to add the given column
-                use special value "first" to add the column as the first in the table
+            for @method='add column'
+            the column in @tbl after which to add the given column
+            use special value "first" to add the column as the first in the table
         to : col
-                for @method in ['alter column', 'rename table']
-                the new column specification for the column
-                only needed if @fields is not Mapping
+            for @method in ['alter column', 'rename table']
+            the new column specification for the column
+            only needed if @fields is not Mapping
 
 
         Returns
@@ -323,7 +323,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         Raises
         ------
         Exception, TypeError, ValueError
-                if the given args, kwargs cannot be validated
+            if the given args, kwargs cannot be validated
         """
         if not self.db.open:
             raise Exception("You must initiate the connection.")
@@ -373,7 +373,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                     )
 
             for c in table.columns:
-                if c.reqd and c.name not in fields:
+                if not c.null and c.name not in fields:
                     raise ValueError(
                         "Database.query@fields must be passed all required fields in @table for @method=insert"
                     )
@@ -605,21 +605,21 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         Parameters
         ----------
         str @method is the MySQL method argument. Use 'distinct' for `select distinct`
-                Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show tables', 'describe',
-                                   'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                                   'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column'
+            Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show tables', 'describe',
+                       'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column'
         str @table is the table name or the Table itself
-                For @method = 'create table', must not be a Table or table name in this database
-                Otherwise, must be a Table in self.tables or a str in self.table_names
+            For @method = 'create table', must not be a Table or table name in this database
+            Otherwise, must be a Table in self.tables or a str in self.table_names
         obj @fields
-                Not required for @method in ['count', 'delete', 'show tables', 'describe', 'drop table', 'truncate']
-                Not required for @method = 'create table' if @table is a Table
-                Must be a Mapping of {field: value} for method in ['insert', 'update']
-                Must be a str, Iterable(col) for method = 'create table' if @table is not a Table
-                Must be a str for method = 'rename table'
-                Must be str or Column for method in ['add column', 'drop column']
-                Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
-                Must be a Iterable(col) or col or 'all' otherwise
+            Not required for @method in ['count', 'delete', 'show tables', 'describe', 'drop table', 'truncate']
+            Not required for @method = 'create table' if @table is a Table
+            Must be a Mapping of {field: value} for method in ['insert', 'update']
+            Must be a str, Iterable(col) for method = 'create table' if @table is not a Table
+            Must be a str for method = 'rename table'
+            Must be str or Column for method in ['add column', 'drop column']
+            Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
+            Must be a Iterable(col) or col or 'all' otherwise
         *
         col @where
                 a Column with dtype in 'comparison', generated from performing a comparison on a Column
@@ -630,20 +630,20 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
 
         Additional kwargs
         -----------------
-        temp : bool = False
-                for @method in ['create table', 'drop table']
-                whether or not the table is a temporary table
+        temporary : bool = False
+            for @method in ['create table', 'drop table']
+            whether or not the table is a temporary table
         clobber : bool = False
-                for @method='create table'
-                whether or not to overwrite the table if it already exists
+            for @method='create table'
+            whether or not to overwrite the table if it already exists
         after : col
-                for @method='add column'
-                the column in @tbl after which to add the given column
-                use special value "first" to add the column as the first in the table
+            for @method='add column'
+            the column in @tbl after which to add the given column
+            use special value "first" to add the column as the first in the table
         to : col
-                for @method in ['alter column', 'rename table']
-                the new column specification for the column
-                only needed if @fields is not Mapping
+            for @method in ['alter column', 'rename table']
+            the new column specification for the column
+            only needed if @fields is not Mapping
 
         Returns
         -------
@@ -669,8 +669,8 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         elif "drop" in method and "table" in method:
             where, groupby, orderby, limit = None, None, None, None
 
-            if "temporary" in method or "temp" not in kwargs:
-                kwargs["temp"] = "temporary" in method  # default to not temporary
+            if "temporary" in method or "temporary" not in kwargs:
+                kwargs["temporary"] = "temporary" in method  # default to not temporary
 
             method = "drop table"
 
@@ -684,8 +684,8 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         elif ("create" in method or "add" in method) and "table" in method:
             where, groupby, orderby, limit = None, None, None, None
 
-            if "temporary" in method or "temp" not in kwargs:
-                kwargs["temp"] = "temporary" in method  # default to not temporary
+            if "temporary" in method or "temporary" not in kwargs:
+                kwargs["temporary"] = "temporary" in method  # default to not temporary
 
             if (
                 any(
@@ -771,7 +771,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         elif "drop" in method and "table" in method:
             sql = (
                 "drop "
-                + ("temporary " if kwargs["temp"] else "")
+                + ("temporary " if kwargs["temporary"] else "")
                 + f"table {table!r} if exists"
             )
 
@@ -781,7 +781,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         elif ("create" in method or "add" in method) and "table" in method:
             sql = (
                 "create "
-                + ("temporary " if kwargs["temp"] else "")
+                + ("temporary " if kwargs["temporary"] else "")
                 + f"table {table!r}"
             )
             sql += (" if not exists" if not kwargs["clobber"] else "") + " ("

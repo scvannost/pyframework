@@ -88,7 +88,7 @@ class MysqldbDatabase(AbstractMySqlDatabase):
     drop_fk()
             drops the named foreign key on the given table
     drop_table()
-            drop the given table; temp to only drop TEMPORARY tables
+            drop the given table; temporary to only drop TEMPORARY tables
     make_table()
             makes a new table with the given name and fields; clobber to overwrite existing table
     move_table()

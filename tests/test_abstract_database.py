@@ -167,7 +167,7 @@ def test_passing_to_query(mockdb: MockMySqlDB, mocker: MockerFixture):
                 "create table",
                 "table",
                 ["field1 int", "field2 int"],
-                temp=False,
+                temporary=False,
                 clobber=False,
             ),
             mocker.call("describe", "table"),
@@ -218,7 +218,7 @@ def test_passing_to_query(mockdb: MockMySqlDB, mocker: MockerFixture):
     query.reset_mock()
 
     mockdb.drop_table("table")
-    query.assert_called_once_with("drop table", "table", temp=False)
+    query.assert_called_once_with("drop table", "table", temporary=False)
     query.reset_mock()
 
 
@@ -499,7 +499,7 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
     )
     mockdb._tables.append(tbl)
     assert (
-        mockdb.query("drop table", "table", temp=True)
+        mockdb.query("drop table", "table", temporary=True)
         == "drop temporary table 'table' if exists;"
     )
     mockdb._tables = []
