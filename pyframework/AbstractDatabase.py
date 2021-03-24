@@ -385,7 +385,6 @@ class AbstractTranslator(abc.ABC):
     def _dtypes_multi(self) -> List[str]:
         """The acceptable dtypes that consistent of fixed set of values"""
         pass
-    
 
     @property
     @abc.abstractmethod
@@ -432,7 +431,6 @@ class AbstractTranslator(abc.ABC):
         else:
             print("else")
             return False
-
 
     @abc.abstractmethod
     def interpret(self, results: Any, *args, **kwargs) -> Union[Any, None]:
@@ -482,15 +480,17 @@ class AbstractTranslator(abc.ABC):
             if dtype.startswith(multi_dtype):
 
                 # need to make sure we have more than just dtype and whitespace
-                if not dtype[len(multi_dtype):].strip():
+                if not dtype[len(multi_dtype) :].strip():
                     if len(definition.split()) == 1:
-                       raise ValueError(f"Cannot find any values for dtype {multi_dtype} from: {dtype + definition}") 
+                        raise ValueError(
+                            f"Cannot find any values for dtype {multi_dtype} from: {dtype + definition}"
+                        )
 
                     temp, definition = definition.split(None, 1)
                     dtype += temp
 
                 # the following non-whitespace char is the container
-                brace = dtype[len(multi_dtype):].strip()[0]
+                brace = dtype[len(multi_dtype) :].strip()[0]
                 # we want through until it's opposite
                 for onset, coda in ["[]", "()", "{}", "<>"]:
                     if brace == onset:
@@ -508,12 +508,14 @@ class AbstractTranslator(abc.ABC):
 
                         # once we find it, we're done
                         if not quotes and token == brace:
-                            temp, definition = definition[:n+1], definition[n+1:]
+                            temp, definition = definition[: n + 1], definition[n + 1 :]
                             dtype += temp
                             break
 
                         # otherwise if we find a not escaped quote
-                        if token in ["'", '"', "`"] and not (quotes and definition[n-1] == "/"):
+                        if token in ["'", '"', "`"] and not (
+                            quotes and definition[n - 1] == "/"
+                        ):
                             # if it's a close quote, stop tracking
                             if quotes and quotes == token:
                                 quotes = ""

@@ -1,5 +1,6 @@
 from typing import Any, Iterable, List, Mapping, Union
 
+
 class Column:
     """
     An object that represents a column within a table in a database and provides a simple interface
@@ -122,12 +123,22 @@ class Column:
             kwargs["name"], definition = definition[1:].split("`", 1)
             definition = definition.strip()
         else:
-            kwargs["name"], definition = definition.split(None, 1) # don't need to strip for None
+            kwargs["name"], definition = definition.split(
+                None, 1
+            )  # don't need to strip for None
         kwargs["name"] = kwargs["name"].lower()
 
         # don't know what dtype will look like
         # but we know what could come after it, so see what the first one of those is
-        options = ["null", "default", "visible", "increment", "unique", "key", "comment"]
+        options = [
+            "null",
+            "default",
+            "visible",
+            "increment",
+            "unique",
+            "key",
+            "comment",
+        ]
         first_opt = options.pop(0)
         while first_opt and first_opt not in definition.lower():
             first_opt = options.pop(0) if len(options) else None
@@ -135,7 +146,7 @@ class Column:
         # if there is one of them in definition
         if first_opt:
             # the dtype is before it
-            dtype = definition[:definition.lower().index(first_opt)].strip()
+            dtype = definition[: definition.lower().index(first_opt)].strip()
 
             # but some have optional preludes from what was checked
             if first_opt == "null" and dtype.endswith(" not"):
@@ -152,9 +163,10 @@ class Column:
             definition = definition.split(dtype, 1)[1].strip().split()
             kwargs["dtype"] = dtype
 
-
             if "default" in definition:
-                start = definition.index("default") + 1  # one for name, one to get following
+                start = (
+                    definition.index("default") + 1
+                )  # one for name, one to get following
                 end = start + 1
                 while end < len(definition) and definition[end] not in [
                     "visible",
@@ -166,10 +178,12 @@ class Column:
                     "comment",
                 ]:
                     end += 1
-                kwargs["default"] = " ".join(definition[start : end])
+                kwargs["default"] = " ".join(definition[start:end])
 
             kwargs["visible"] = "visible" in definition or "invisible" not in definition
-            kwargs["increment"] = "auto_increment" in definition or "increment" in definition
+            kwargs["increment"] = (
+                "auto_increment" in definition or "increment" in definition
+            )
             kwargs["unique"] = "unique" in definition
             kwargs["key"] = "key" in definition
             kwargs["primary"] = "primary" in definition

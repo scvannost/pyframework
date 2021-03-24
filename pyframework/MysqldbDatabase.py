@@ -137,7 +137,9 @@ class MysqldbDatabase(AbstractMySqlDatabase):
             for i in tables:
                 columns = self.query("describe", i)
                 setattr(
-                    self, i, Table(self, i, [Column.from_definition(c) for c in columns])
+                    self,
+                    i,
+                    Table(self, i, [Column.from_definition(c) for c in columns]),
                 )
 
             self._tables = [getattr(self, i) for i in tables]
