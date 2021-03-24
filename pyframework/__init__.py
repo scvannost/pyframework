@@ -3,7 +3,7 @@ A set of layered models that implement many forms of database-like behavior usin
 
 AbstractDatabase, and AbstractTranslator are fully duck-typed
 
-SqlColumn, Table are based off the MySQL schemas
+Column, Table are based off the MySQL schemas
 All other classes (including other abstract classes) are built on top of these
 
 Class inheritance structure
@@ -11,11 +11,12 @@ Class inheritance structure
 AbstractDatabase			  - AbstractTranslator
 	AbstractSqlDatabase 	  -		AbstractSqlTranslator			<- Table/Column dependency begins
 		AbstractMySqlDatabase - 		AbstractMySqlTranslator
-			MysqldbDatabase	  - 			MysqldbTranslator
+			MysqldbDatabase	  - 			MysqldbTranslator		<- requires MySQLdb
 """
 from .AbstractDatabase import AbstractDatabase, AbstractTranslator
-
 from .Table import Column, Table
+
 from .AbstractDatabase import AbstractSqlDatabase, AbstractSqlTranslator
 from .AbstractMySqlDatabase import AbstractMySqlDatabase, AbstractMySqlTranslator
+
 from .MysqldbDatabase import MysqldbDatabase, MysqldbTranslator

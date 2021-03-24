@@ -109,7 +109,7 @@ class MysqldbDatabase(AbstractMySqlDatabase):
     ) -> None:
         if Translator is None:
             Translator = MysqldbTranslator
-        super().__init__(*args, Translator=Translator ** kwargs)
+        super().__init__(*args, Translator=Translator, **kwargs)
 
     def connect(self) -> None:
         """
@@ -125,7 +125,7 @@ class MysqldbDatabase(AbstractMySqlDatabase):
             self._location,
             self._user,
             self._password,
-            self._database,
+            self.name,
             use_unicode=True,
             charset="utf8mb4",
         )
@@ -137,7 +137,7 @@ class MysqldbDatabase(AbstractMySqlDatabase):
             for i in tables:
                 columns = self.query("describe", i)
                 setattr(
-                    self, i, Table(self, i, [Column.from_defintion(c) for c in columns])
+                    self, i, Table(self, i, [Column.from_definition(c) for c in columns])
                 )
 
             self._tables = [getattr(self, i) for i in tables]
@@ -182,14 +182,14 @@ class MysqldbDatabase(AbstractMySqlDatabase):
         if not isinstance(maxrows, int):
             raise TypeError("Database.db_query@maxrows must be an int.")
         elif maxrows < 0:
-            raise ValueError("Database.db_query@maxrows must be positibe")
+            raise ValueError("Database.db_query@maxrows must be positive")
 
         # deal with `how` kwarg
         how = kwargs.pop("how", 1)  # default to dictionary
         if not isinstance(how, int):
-            "Database.db_query@how must be an int."
+            raise TypeError("Database.db_query@how must be an int.")
         elif not 0 <= how <= 2:
-            "Database.db_query@how must be 0, 1, or 2."
+            raise ValueError("Database.db_query@how must be 0, 1, or 2.")
 
         # run the call
         self._db.query(q)
@@ -291,7 +291,6 @@ class MysqldbTranslator(AbstractMySqlTranslator):
             else:
                 # ( {key : value} )
                 results = [f"`{r['Field']}` {r['COLUMNS.Type']}" for r in results]
-            sql += ")"
 
         elif "show" in method and "tables" in table:
             if "how" in kwargs and kwargs["how"] == 0:

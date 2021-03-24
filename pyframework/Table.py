@@ -1,6 +1,5 @@
 from typing import Any, Iterable, List, Mapping, Union
 
-
 class Column:
     """
     An object that represents a column within a table in a database and provides a simple interface
@@ -116,34 +115,72 @@ class Column:
             the table of the column
         """
         kwargs = {"table": table}
+        definition = definition.strip()
 
-        kwargs["name"], kwargs["dtype"], *lower_def = definition.lower().split()
-        kwargs["null"] = "not" not in lower_def if "null" in lower_def else False
+        # get the name as the first word or phrase
+        if definition[0] == "`":
+            kwargs["name"], definition = definition[1:].split("`", 1)
+            definition = definition.strip()
+        else:
+            kwargs["name"], definition = definition.split(None, 1) # don't need to strip for None
+        kwargs["name"] = kwargs["name"].lower()
 
-        if "default" in lower_def:
-            start = lower_def.index("default") + 1  # one for name, one to get following
-            end = start + 1
-            while end < len(lower_def) and lower_def[end] not in [
-                "visible",
-                "invisible",
-                "auto_increment",
-                "increment",
-                "unique",
-                "key",
-                "comment",
-            ]:
-                end += 1
-            kwargs["default"] = " ".join(definition.split()[start + 2 : end + 2])
+        # don't know what dtype will look like
+        # but we know what could come after it, so see what the first one of those is
+        options = ["null", "default", "visible", "increment", "unique", "key", "comment"]
+        first_opt = options.pop(0)
+        while first_opt and first_opt not in definition.lower():
+            first_opt = options.pop(0) if len(options) else None
 
-        kwargs["visible"] = "visible" in lower_def or "invisible" not in lower_def
-        kwargs["increment"] = "auto_increment" in lower_def or "increment" in lower_def
-        kwargs["unique"] = "unique" in lower_def
-        kwargs["key"] = "key" in lower_def
-        kwargs["primary"] = "primary" in lower_def
+        # if there is one of them in definition
+        if first_opt:
+            # the dtype is before it
+            dtype = definition[:definition.lower().index(first_opt)].strip()
 
-        if "comment" in lower_def:
-            start = lower_def.index("comment") + 1
-            kwargs["comment"] = " ".join(definition.split()[start + 2 :])
+            # but some have optional preludes from what was checked
+            if first_opt == "null" and dtype.endswith(" not"):
+                dtype = dtype[:-3].strip()
+                kwargs["null"] = False
+            elif first_opt == "visible" and dtype.endswith(" in"):
+                dtype = dtype[:-2].strip()
+            elif first_opt == "increment" and dtype.endswith(" auto_"):
+                dtype = dtype[:-5].strip()
+            elif first_opt == "key" and dtype.endswith(" primary"):
+                dtype = dtype[:-7].strip()
+
+            # the definition then continues after the dtype
+            definition = definition.split(dtype, 1)[1].strip().split()
+            kwargs["dtype"] = dtype
+
+
+            if "default" in definition:
+                start = definition.index("default") + 1  # one for name, one to get following
+                end = start + 1
+                while end < len(definition) and definition[end] not in [
+                    "visible",
+                    "invisible",
+                    "auto_increment",
+                    "increment",
+                    "unique",
+                    "key",
+                    "comment",
+                ]:
+                    end += 1
+                kwargs["default"] = " ".join(definition[start : end])
+
+            kwargs["visible"] = "visible" in definition or "invisible" not in definition
+            kwargs["increment"] = "auto_increment" in definition or "increment" in definition
+            kwargs["unique"] = "unique" in definition
+            kwargs["key"] = "key" in definition
+            kwargs["primary"] = "primary" in definition
+
+            if "comment" in definition:
+                start = definition.index("comment") + 1
+                kwargs["comment"] = " ".join(definition[start:])
+
+        # if there's none, we're done
+        else:
+            kwargs["dtype"] = definition
 
         return cls(**kwargs)
 

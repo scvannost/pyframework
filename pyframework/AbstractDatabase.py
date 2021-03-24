@@ -377,8 +377,15 @@ class AbstractTranslator(abc.ABC):
     @property
     @abc.abstractmethod
     def dtypes(self) -> List[str]:
-        """The acceptable types for this database"""
+        """The acceptable types for this database, including the name of multi dtypes"""
         pass
+
+    @property
+    @abc.abstractmethod
+    def _dtypes_multi(self) -> List[str]:
+        """The acceptable dtypes that consistent of fixed set of values"""
+        pass
+    
 
     @property
     @abc.abstractmethod
@@ -426,6 +433,7 @@ class AbstractTranslator(abc.ABC):
             print("else")
             return False
 
+
     @abc.abstractmethod
     def interpret(self, results: Any, *args, **kwargs) -> Union[Any, None]:
         """
@@ -450,12 +458,83 @@ class AbstractTranslator(abc.ABC):
         """
         pass
 
+    def lstrip_dtype(self, definition: str) -> Tuple[str, str]:
+        """
+        Parameters
+        ----------
+        definition : str
+            begins with a valid dtype
+
+        Returns
+        -------
+        str
+            the dtype, properly hanlding those in _dtypes_multi
+        str
+            the rest of the definition
+        """
+        if len(definition.split()) == 1:
+            raise ValueError(f"Cannot strip a dtype from a single word: {definition}")
+
+        dtype, definition = definition.split(None, 1)
+
+        for multi_dtype in self._dtypes_multi:
+            # for each multi type, test, and break out when we've done it
+            if dtype.startswith(multi_dtype):
+
+                # need to make sure we have more than just dtype and whitespace
+                if not dtype[len(multi_dtype):].strip():
+                    if len(definition.split()) == 1:
+                       raise ValueError(f"Cannot find any values for dtype {multi_dtype} from: {dtype + definition}") 
+
+                    temp, definition = definition.split(None, 1)
+                    dtype += temp
+
+                # the following non-whitespace char is the container
+                brace = dtype[len(multi_dtype):].strip()[0]
+                # we want through until it's opposite
+                for onset, coda in ["[]", "()", "{}", "<>"]:
+                    if brace == onset:
+                        brace = coda
+                        break
+
+                # extend the dtype to find the end
+                if brace not in dtype:
+
+                    # but don't want to break within quotes, so track that
+                    quotes = ""
+                    for n in range(len(definition)):
+                        # loop through the rest
+                        token = definition[n]
+
+                        # once we find it, we're done
+                        if not quotes and token == brace:
+                            temp, definition = definition[:n+1], definition[n+1:]
+                            dtype += temp
+                            break
+
+                        # otherwise if we find a not escaped quote
+                        if token in ["'", '"', "`"] and not (quotes and definition[n-1] == "/"):
+                            # if it's a close quote, stop tracking
+                            if quotes and quotes == token:
+                                quotes = ""
+                            # if it's an open quote, start tracking
+                            elif not quotes:
+                                quotes = tokens
+                            # don't care about it otherwise
+                            else:
+                                pass
+
+                # once we're done processing, don't need to check the rest of the multi dtypes
+                break
+
+        return dtype, definition
+
     def validate_and_raise(self, *args, **kwargs):
         """
         Validates the given args and kwargs to see if it is in the correct format for self.prepare or class.prepare_and_raise
 
         Parameters
-        -------
+        ----------
         args : tuple
             the raw args for processing to give to self.translate
         kwargs : dict

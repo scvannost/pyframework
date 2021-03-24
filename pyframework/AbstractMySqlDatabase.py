@@ -216,7 +216,12 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
 
     @property
     def dtypes(self):
-        return [k.lower().split("[")[0] for k in MYSQL_TYPES.keys()]
+        return [k.lower().split("[")[0] for k in MYSQL_TYPES.keys()] + self._dtypes_multi
+
+    @property
+    def _dtypes_multi(self):
+        return [k.lower().split("(")[0] for k in MYSQL_MULTI_TYPES.keys()]
+    
 
     @abc.abstractmethod
     def interpret(
@@ -893,7 +898,8 @@ MYSQL_TYPES = {
     "MEDIUMBLOB": "up to 16777215 bytes",
     "MEDIUMTEXT": "a string stored as up to 16777215 bytes",
     "LONGBLOB": "up to 42942967295B = 4GB",
-    "LONGTEXT": "a string stored as up to 42942967295B = 4GB",
-    "ENUM('value1','value2',...)": "one value from a set; max length of a value is 255 char or 1020 bytes",
-    "SET('value1','value2',...)": "a set of up to 64 values; max length of a value is 255 char or 1020 bytes",
+    "LONGTEXT": "a string stored as up to 42942967295B = 4GB"}
+MYSQL_MULTI_TYPES = {
+    "ENUM('value1','value2',...)": "one value from the list; max length of a value is 255 char or 1020 bytes",
+    "SET('value1','value2',...)": "a set of up to 64 values from the list; max length of a value is 255 char or 1020 bytes",
 }

@@ -29,6 +29,11 @@ def test_from_definition():
     assert col.primary
     assert col.comment == "'foo bar'"
 
+    # no checking on dtype, but takes everything up to the next option
+    col = Column.from_definition("name foo bar baz")
+    assert col.name == "name"
+    assert col.dtype == "foo bar baz"
+
 
 def test_dunder(mocker: MockerFixture):
     assert repr(Column.from_definition("name dtype")) == "name"
