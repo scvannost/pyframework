@@ -1036,7 +1036,7 @@ class AbstractSqlDatabase(AbstractDatabase):
     ) -> Any:
         """
         Provides the API through which you can query the database without writing SQL code yourself
-        This function relies on self.prepare, self.translate, and self.db_query, which all are implemented by a subclass
+        This function relies on self.prepare, self.translate, self.db_query, and self.interpret, which all are implemented by a subclass
         Any new subclass of AbstractSqlDatabase should be written to provide the functionality below, at a minimum
         Expanded functionality can be handled via special kwargs that are otherwise silently ignored in other functions
 
@@ -1087,7 +1087,7 @@ class AbstractSqlDatabase(AbstractDatabase):
             for @method in ['alter column', 'rename table']
             the new column specification for the column
             only needed if @fields is not Mapping
-        all additional kwargs passed through to self.[prepare / translate / db_query]
+        all additional kwargs passed through to self.[prepare / translate / db_query / interpret]
         """
         self.validate_and_raise(
             method,
@@ -1115,7 +1115,7 @@ class AbstractSqlDatabase(AbstractDatabase):
             **kwargs,
         )
 
-        return self.translator.interpret(
+        return self.interpret(
             results,
             method,
             table,

@@ -238,7 +238,8 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         str @method is the SQL method argument. Use 'distinct' for `select distinct`
             Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
                        'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                       'rename table', 'truncate [table]', 'add/create column', 'drop column'
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column',
+                       'add foreign [key]', 'add index', 'add primary [key]', 'add unique [key / index]'
 
         Returns
         -------
@@ -282,7 +283,8 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         str @method is the SQL method argument. Use 'distinct' for `select distinct`
             Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
                        'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                       'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column'
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column',
+                       'add foreign [key]', 'add index', 'add primary [key]', 'add unique [key / index]'
         str @table is the table name or the Table itself
             For @method = 'create table', must not be a Table or table name in this database
             Otherwise, must be a Table in self.tables or a str in self.table_names
@@ -320,7 +322,9 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             for @method in ['alter column', 'rename table']
             the new column specification for the column
             only needed if @fields is not Mapping
-
+        foreign : col
+            for @method='add foreign'
+            the column to reference as the foreign key
 
         Returns
         -------
@@ -539,6 +543,38 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                     "Database.query@fields must be 'all' or Iterable(col)."
                 )
 
+        elif "add" in method and any(
+            [i in method for i in ["foreign", "index", "primary", "unique"]]
+        ):
+            if (
+                sum([i in method for i in ["foreign", "index", "primary", "unique"]])
+                != 1
+            ):
+                raise ValueError(
+                    "Database.query@method must not contain multiple constraints to add"
+                )
+
+            where, groupby, orderby, limit = None, None, None, None
+            fields = table.get_column(fields)
+            if not fields:
+                raise ValueError(
+                    'Database.query@fields must be a column in @table for @method="add [foreign / index / primary / unique]"'
+                )
+
+            if "foreign" in method:
+                foreign = kwargs.get("foreign", None)
+                if not foreign:
+                    raise ValueError(
+                        'Database.query@foreign must be provided for @method="add foreign"'
+                    )
+
+                if isinstance(foreign, Column) and foreign.table == fields.table:
+                    raise ValueError(
+                        f"Cannot foreign key a table on itself\ntarget: {target}\nforeign: {foreign}"
+                    )
+
+            raise NotImplementedError()
+
         elif method == "delete":
             fields, groupby, orderby, limit = (
                 None,
@@ -613,7 +649,8 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         str @method is the MySQL method argument. Use 'distinct' for `select distinct`
             Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show tables', 'describe',
                        'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                       'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column'
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column',
+                       'add foreign [key]', 'add index', 'add primary [key]', 'add unique [key / index]'
         str @table is the table name or the Table itself
             For @method = 'create table', must not be a Table or table name in this database
             Otherwise, must be a Table in self.tables or a str in self.table_names
@@ -740,6 +777,12 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             if not isinstance(fields, Iterable):  # str is an Iterable
                 fields = [fields]
 
+        elif (
+            "add" in method and any(["foreign", "index", "primary", "unique"]) in method
+        ):
+            where, groupby, orderby, limit = None, None, None, None
+            fields = table.get_column(fields)
+
         elif method == "count":
             # TODO let count more things
             fields, orderby, limit = "*", None, None
@@ -828,6 +871,20 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         elif "show" in method and "tables" in table:
             sql = "show tables"
 
+        elif "add" in method and any(
+            [i in method for i in ["foreign", "index", "primary", "unique"]]
+        ):
+            submethod = [
+                i for i in ["foreign", "index", "primary", "unique"] if i in method
+            ][0]
+            if submethod in ["foreign", "primary"]:
+                submethod += " key"
+
+            sql = f"alter table {table!r} add constraint {submethod} ({fields!r}) "
+
+            if submethod == "foreign":
+                sql += f"references {kwargs['foreign']!r} "
+
         else:
             raise Exception(method)
 
@@ -843,7 +900,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
 
         return sql + ";"
 
-    def groupby(self, groupby: Union[str, Table]) -> str:
+    def groupby(self, groupby: Union[str, Column]) -> str:
         return f" group by {groupby!r}"
 
     def join(

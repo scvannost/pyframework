@@ -14,34 +14,32 @@ class AbstractConstraint(abc.ABC):
         return self._target_column
 
     @classmethod
-    def on_column(cls, column: Column, *args, **kwargs):
-        return cls(column.table, column, *args, **kwargs)
-
-    @classmethod
-    def _add_to_column(cls, self, table, column):
+    def _add_to_column(cls, instance, table, column):
         if not hasattr(table, "_relations"):
             setattr(table, "_relations", [])
-        table._relations.append(self)
+        table._relations.append(instance)
 
         if not hasattr(column, "_relations"):
             setattr(column, "_relations", [])
-        column._relations.append(self)
+        column._relations.append(instance)
 
 
 class ForeignKey(AbstractConstraint):
     def __init__(
         self,
-        target_table: Table,
-        target_column: Column,
-        foreign_table: Table,
-        foreign_column: Column,
+        target: Union[Tuple[Table, Column], Column],
+        foreign: Union[Tuple[Table, Column], Column],
     ):
-        self._target_table = target_table
-        self._target_column = target_column
+        if isinstance(target, Iterable) and len(target) == 2:
+            self._target_table, self._target_column = target
+        elif isinstance(target, Column):
+            self._target_table, self._target_column = target.table, target
         AbstractConstraint._add_to_column(self, self._target_table, self._target_column)
 
-        self._foreign_table = foreign_table
-        self._foreign_column = foreign_column
+        if isinstance(foreign, Iterable) and len(foreign) == 2:
+            self._foreign_table, self._foreign_column = foreign
+        elif isinstance(foreign, Column):
+            self._foreign_table, self._foreign_column = foreign.table, foreign
         AbstractConstraint._add_to_column(
             self, self._foreign_table, self._foreign_column
         )
@@ -53,7 +51,3 @@ class ForeignKey(AbstractConstraint):
     @property
     def foreign_column(self):
         return self._foreign_column
-
-    @classmethod
-    def column_to_column(cls, target: Column, foreign: Column):
-        return cls(target.table, target, foreign.table, foreign)

@@ -3,6 +3,7 @@ from pytest_mock import MockerFixture
 from typing import Any
 
 from pyframework import Column, Table
+from pyframework.Table import ForeignKey, Index, Primary, Unique
 
 
 def test_from_definition():
@@ -149,3 +150,96 @@ def test_table(mocker: MockerFixture):
             where=None,
         )
     )
+
+
+def test_constraints(mocker: MockerFixture):
+    col = Column.from_definition("name dtype not null")
+    col2 = Column.from_definition("test dtype unique")
+
+    table = mocker.Mock()
+    table.columns = [col, col2]
+    table.select = mocker.MagicMock()
+    table.select.return_value = [
+        {"name": "foo", "test": "bar"},
+        {"name": "biz", "test": "buz"},
+    ]
+    table.distinct = table.select
+
+    index = Index(col)
+    mocker.patch.object(index.target, "_table", table)
+    col = index.target
+
+    spy = mocker.spy(index, "prepare")
+    assert index.validate(None) == index
+    spy.assert_called_once()
+    assert table.select.called_with(mocker.call(["name", "test"]))
+    assert hasattr(index, "values")
+    assert index.values == {"foo": {"test": "bar"}, "biz": {"test": "buz"}}
+
+    table.select.reset_mock()
+    table.select.return_value = [{"name": "foo"}, {"name": "biz"}]
+
+    unique = Unique(col)
+    spy = mocker.spy(unique, "prepare")
+    assert unique.validate(None) == unique
+    spy.assert_called_once()
+    assert table.select.called_with(mocker.call("name"))
+    assert hasattr(unique, "values")
+    assert unique.values == ["foo", "biz"]
+    with pytest.raises(ValueError, match="is not unique"):
+        unique.validate("foo")
+
+    with pytest.raises(ValueError, match="may only be created"):
+        Primary(col2)
+
+    table.select.reset_mock()
+    table.select.return_value = [
+        {"name": "foo", "test": "bar"},
+        {"name": "biz", "test": "buz"},
+    ]
+    col2._table = table
+    col._table = None
+
+    col2._constraints = []
+    with pytest.raises(ValueError, match="table on itself"):
+        ForeignKey(col, col)
+    fk = ForeignKey(col, col2)
+    spy = mocker.spy(fk, "prepare")
+    assert col2.get_constraint("index") is not None
+
+    assert fk.validate("bar")
+    spy.assert_called_once()
+
+
+def test_get_constraint():
+    col = Column.from_definition("name dtype not null")
+    col._constraints = []
+
+    assert col.get_constraint("index") is None
+    assert col.get_constraint("unique") is None
+    assert col.get_constraint("primary") is None
+
+    index = Index(col)
+    assert index in col.constraints
+    assert col.get_constraint("index") == index
+
+    unique = Unique(col)
+    assert index in col.constraints and unique in col.constraints
+    assert col.get_constraint("unique") == unique
+    assert col.get_constraint("index") == unique
+    assert index not in col.constraints
+
+    index = Index(col)
+    primary = Primary(col)
+    assert all([i in col.constraints for i in [unique, index, primary]])
+    assert col.get_constraint("primary") == primary
+    assert col.get_constraint("unique") == primary
+    assert unique not in col.constraints
+    assert col.get_constraint("index") == primary
+    assert index not in col.constraints
+
+    col2 = Column.from_definition("name2 dtype unique", table="Table2")
+    fk = ForeignKey(col, col2)
+    assert fk in col.constraints and primary in col.constraints
+    assert col.get_constraint("fk_None_name") == fk
+    assert col.get_constraint(fk) == fk

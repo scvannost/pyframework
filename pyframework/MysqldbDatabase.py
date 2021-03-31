@@ -248,7 +248,8 @@ class MysqldbTranslator(AbstractMySqlTranslator):
         str @method is the SQL method argument. Use 'distinct' for `select distinct`
                 Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
                                    'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] table',
-                                   'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column'
+                                   'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column',
+                       'add foreign [key]', 'add index', 'add primary [key]', 'add unique [key / index]'
         str @table is the table name or the Table itself
                 For @method = 'create table', must not be a Table or table name in self.db
                 Otherwise, must be a Table in self.db.tables or a str in self.db.table_names
@@ -266,7 +267,8 @@ class MysqldbTranslator(AbstractMySqlTranslator):
         """
         if results is None:
             # method in ['update', 'delete', 'insert', 'create table', 'drop table', 'rename table', 'truncate table',
-            # 			 'add column', 'drop column', 'alter column']
+            # 			 'add column', 'drop column', 'alter column', 'add foreign [key]', 'add index', 'add primary [key]',
+            #            'add unique [key / index]']
             return None
 
         if method in ["select", "distinct"]:

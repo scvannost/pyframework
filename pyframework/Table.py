@@ -1,3 +1,4 @@
+import abc
 from typing import Any, Iterable, List, Mapping, Union
 
 
@@ -7,7 +8,7 @@ class Column:
 
     Parameters
     ----------
-    table : Any
+    table : Table
         the table to which this column belongs
     name : str
         the name of this column
@@ -29,12 +30,12 @@ class Column:
     primary: bool = False
         whether or not the column is the primary key
         implies @unique and @key are True
-    comment: str = ''
+    comment: str = ""
         a comment about the column
 
     Properties
     ----------
-    table : Any
+    table : Table
         the table to which this column belongs
     name : str
         the name of this column
@@ -55,7 +56,7 @@ class Column:
     primary: bool = False
         whether or not the column is the primary key
         implies @unique and @key are True
-    comment: str = ''
+    comment: str = ""
         a comment about the column
 
     Methods
@@ -76,7 +77,7 @@ class Column:
 
     def __init__(
         self,
-        table: Any,
+        table: "Table",
         name: str,
         dtype: Any,
         *,
@@ -88,18 +89,24 @@ class Column:
         key: bool = False,
         primary: bool = False,
         comment: str = "",
+        constraints: Iterable["AbstractConstraint"] = [],
     ) -> None:
         self._table = table
         self._name = name
         self._dtype = dtype
-        self._null = True if null else False
+        self._null = True if null and not primary else False
         self._default = default
         self._visible = True if visible else False
         self._increment = True if increment else False
-        self._unique = True if unique or primary else False
-        self._key = True if key or primary else False
-        self._primary = True if primary else False
         self._comment = comment
+        self._constraints = constraints
+
+        if primary:
+            Primary(self)
+        elif unique:
+            Unique(self)
+        elif key:
+            Index(self)
 
     @classmethod
     def from_definition(cls, definition: str, *, table: Any = None) -> "Column":
@@ -211,7 +218,7 @@ class Column:
         return f"{self.name} {self.dtype!s}"
 
     @property
-    def table(self) -> Any:
+    def table(self) -> "Table":
         """
         The Table this column is attached to
         Can be None if passed explicitly during creation
@@ -231,9 +238,9 @@ class Column:
 
         Special values
         --------------
-        'comparison'
+        "comparison"
             the result of using comparison methods on two columns
-        'operation'
+        "operation"
             the result of using operation methods on a column
         """
         return self._dtype
@@ -261,12 +268,12 @@ class Column:
     @property
     def unique(self) -> bool:
         """Returns whether or not the column must only contain unique entries"""
-        return self._unique
+        return self.get_constraint("unique") is not None
 
     @property
     def key(self) -> bool:
         """Returns whether or not this column is a key aka index"""
-        return self._key
+        return self.get_constraint("index") is not None
 
     @property
     def primary(self) -> bool:
@@ -274,12 +281,99 @@ class Column:
         Returns whether or not the column is the primary key of the table
         Implies both self.key and self.unique are True
         """
-        return self._primary
+        return self.get_constraint("primary") is not None
 
     @property
     def comment(self) -> str:
         """Returns the comment on this column"""
         return self._comment
+
+    @property
+    def constraints(self) -> Iterable["AbstractConstraint"]:
+        """Returns the constraints on this column"""
+        return self._constraints
+
+    def get_constraint(self, constraint: Union["AbstractConstraint", str]):
+        """
+        Returns the given constraint or None if it's in  ["unique", "primary", "index"]
+            if multiple match, removes all but the returned instance
+                a primary relation is kept in preference to unique
+        Otherwise returns its argument
+        """
+        if isinstance(constraint, str) and constraint == "index":
+            ret = [
+                c for c in self.constraints if c.name in ["index", "primary", "unique"]
+            ]
+
+            if len(ret) == 0:
+                return None
+            elif len(ret) > 1:
+                if any([c.name == "primary" for c in ret]):
+                    # if the first one isn't the primary, we need to put it there
+                    # this assures that primary is kept over any uniques or indexes
+                    # False is less than True, so sort by the inverse
+                    ret = sorted(ret, key=lambda x: x.name != "primary")
+                elif any([c.name == "unique" for c in ret]):
+                    # if there's no primary and the first one isn't the unique, we need to put it there
+                    # this assures that unique is kept over any indexes
+                    # False is less than True, so sort by the inverse
+                    ret = sorted(ret, key=lambda x: x.name != "unique")
+
+                # remove all of the repetitive ones except the first
+                # see the conditional sorting above to determine the overall effect
+                self._constraints = [
+                    c
+                    for c in self.constraints
+                    if c.name not in ["index", "unique", "primary"]
+                ] + ret[:1]
+                return ret[0]
+
+            else:  # len(ret) == 1
+                return ret[0]
+
+        elif isinstance(constraint, str) and constraint in ["unique", "primary"]:
+            ret = [c for c in self.constraints if c.name in ["unique", "primary"]]
+
+            if len(ret) == 0:
+                return None
+            elif len(ret) > 1:
+                if (
+                    any([c.name == "primary" for c in ret])
+                    and not ret[0].name == "primary"
+                ):
+                    # if the first one isn't the primary, we need to put it there
+                    # this assures that primary is kept over any uniques
+                    # False is less than True, so sort by the inverse
+                    ret = sorted(ret, key=lambda x: x.name != "primary")
+
+                # remove all of the repetitive ones except the first
+                # see the conditional sorting above to determine the overall effect
+                self._constraints = [
+                    c for c in self.constraints if c.name not in ["unique", "primary"]
+                ] + ret[:1]
+                return ret[0]
+            else:  # len(ret) == 1
+                return ret[0]
+        elif isinstance(constraint, str) and any(
+            [c.name == constraint for c in self.constraints]
+        ):
+            ret = [c for c in self.constraints if c.name == constraint]
+
+            if len(ret) == 0:
+                return None
+            elif len(ret) > 1:
+                # remove all of the repetitive ones except the first
+                # asserting that same name means redundant
+                # this can lead to unintended effects if different constraints have the same name
+                self._constraints = [
+                    c for c in self.constraints if c.name != constraint
+                ] + ret[:1]
+                return ret[0]
+            else:  # len(ret) == 1
+                return ret[0]
+
+        else:
+            return constraint
 
     def __bool__(self) -> bool:
         # handle comparisons by doing a comparison
@@ -428,7 +522,7 @@ class Table:
         whether or not this a temporary table
     increment: int = None
         the initial value for auto incrementating
-    comment: str = ''
+    comment: str = ""
         a comment about the table
 
 
@@ -447,7 +541,7 @@ class Table:
         whether or not this a temporary table
     increment: int = None
         the initial value for auto incrementating
-    comment: str = ''
+    comment: str = ""
         a comment about the table
 
     Methods
@@ -532,6 +626,101 @@ class Table:
         """A comment about the table"""
         return self._comment
 
+    @property
+    def constraints(self) -> List["AbstractConstraint"]:
+        """The constraints on all column of this table"""
+        return [c for column in self.columns for c in column.constraints]
+
+    def add_foreign_key(self, col: Union[str, Column], foreign: Union[str, Column]):
+        """
+        Runs an 'alter table add foreign key' SQL query on the table
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        foreign: str, Column = None
+            if given, the column to use as the foreign key
+            if @primary or @unique, calls them then returns result of foreign key
+        """
+        return self.db.query("add foreign", self, col, foreign=foreign)
+
+    def add_index(self, col: Union[str, Column], *, unique: bool = False):
+        """
+        Runs an 'alter table add [unique] index' SQL query on the table for the given column
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        *
+        unique: bool = False
+            if True, make this a unique column
+        """
+        if unique:
+            return self.add_unique(col)
+        else:
+            Index(col)
+            return self.db.query("add index", self, col)
+
+    def add_key(
+        self,
+        col: Union[str, Column],
+        *,
+        primary: bool = False,
+        unique: bool = False,
+        foreign: Union[str, Column] = None,
+    ):
+        """
+        Runs an 'alter table add [primary / unique / foreign] key' SQL query on the table for the given column
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        *
+        primary: bool = False
+            if True, make this a primary key
+            implies @unique = True as well
+        unique: bool = False
+            if True, make this a unique column
+        foreign: str, Column = None
+            if given, the column to use as the foreign key
+            if @primary or @unique, calls them then returns result of foreign key
+        """
+        if foreign is not None:
+            if primary or unique:
+                self.add_key(col, primary=primary, unique=unique)
+            return self.add_foreign_key(col, foreign)
+        elif primary:
+            return self.add_primary(col)
+        elif unique:
+            return self.add_unique(col)
+        else:
+            return self.add_index(col)
+
+    def add_primary_key(self, col: Union[str, Column]):
+        """
+        Runs an 'alter table add primary key' SQL query on the table
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        """
+        return self.db.query("add primary", self, col)
+
+    def add_unique(self, col: Union[str, Column]):
+        """
+        Runs an 'alter table add unique' SQL query on the table
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        """
+        return self.db.query("add unique", self, col)
+
     def get_column(self, col: Any) -> Any:
         """
         Returns the given col if it's in self.columns or col : str in self.column_names
@@ -552,33 +741,70 @@ class Table:
         else:
             return None
 
-    def count(self, where: Column = None, groupby: Column = None, **kwargs):
+    def count(
+        self,
+        where: Union[str, Column] = None,
+        groupby: Union[str, Column] = None,
+        **kwargs,
+    ):
         """
         Runs a 'count' SQL query on the table.
-        @where specifies a condition to meet.
+
+        Parameters
+        ----------
+        where : str, Column = None
+            a condition that needs to be met to be selected
+            Column with dtype in 'comparison', generated from performing a comparison on a Column
+        groupby : str, Column = None
+            the field to group the data by
+        **kwargs
+            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
         """
         return self.db.query("count", self.name, where=where, groupby=groupby, **kwargs)
 
-    def delete(self, where: Column = None):
+    def delete(self, where: Union[str, Column] = None, **kwargs):
         """
         Runs a 'delete' SQL query on the table.
-        @where specifies a condition to meet.
+
+        Parameters
+        ----------
+        where : str, Column = None
+            a condition that needs to be met to be selected
+            Column with dtype in 'comparison', generated from performing a comparison on a Column
+        **kwargs
+            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
         """
         return self.db.query("delete", self.name, where=where)
 
     def distinct(
         self,
-        fields: Union[Iterable[Union[str, Column]]] = None,
-        where=None,
+        fields: Union[str, Column, Iterable[Union[str, Column]]] = "all",
+        *,
+        where: Union[str, Column] = None,
         limit: int = None,
-        orderby=None,
+        groupby: Union[str, Column] = None,
+        orderby: Union[str, Column] = None,
+        **kwargs,
     ):
         """
         Runs a 'select distinct' SQL query on the table.
-        @fields specifies what fields to be unique over as 'all' or list(str).
-        @where specifies a condition to meet.
-        @limit specifies the maximum number of rows to return.
-        @orderby specifies what to order by.
+
+        Parameters
+        ----------
+        fields : str, Column, Iterable[str, Column], or "all"
+            the distinct fields to select from the table
+        *
+        where : str, Column = None
+            a condition that needs to be met to be selected
+            Column with dtype in 'comparison', generated from performing a comparison on a Column
+        limit : int = None
+            the maximum number of rows to return
+        groupby : str, Column = None
+            the field to group the data by
+        orderby : str, Column = None
+            the field to order the data by
+        **kwargs
+            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
         """
         return self.db.query(
             "distinct",
@@ -586,25 +812,34 @@ class Table:
             fields=fields,
             where=where,
             limit=limit,
+            groupby=groupby,
             orderby=orderby,
+            **kwargs,
         )
 
-    def insert(self, fields: Mapping[Union[str, Column], Any]):
+    def insert(self, fields: Mapping[Union[str, Column], Any], **kwargs):
         """
         Runs an 'insert' SQL query on the table.
-        @fields specifies what values to insert as Mapping(field : value)
-        @extra is tacked on the end of the query.
-        """
-        return self.db.query("insert", self.name, fields=fields)
 
-    def join(self, table, on: str, direction: str = "inner", alias: str = None):
+        Parameters
+        ----------
+        fields : Mapping[Union[str, Column] : Any]
+            what values to insert into the table
+        **kwargs
+            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
+        """
+        return self.db.query("insert", self.name, fields=fields, **kwargs)
+
+    def join(
+        self, table: "Table", on: str, direction: str = "inner", alias: str = None
+    ):
         """
         Returns a Table of this table joined to @table.
         Returns None if there is an error.
 
         str @table is a Table object with .name and .columns{} properties.
         str @on specifies the joining condition.
-        str @direction specifies 'inner', 'left', or 'right'; default 'inner'
+        str @direction specifies 'inner', 'left', or 'right'; default "inner"
         str @alias specifies the alias of @table.
         """
         if not table.db == self.db:
@@ -612,7 +847,7 @@ class Table:
         if not isinstance(on, Column) or on.dtype != "comparison":
             raise TypeError('Table.join@on must be a Column with dtype "comparison"')
         if not direction.lower() in ["inner", "left", "right"]:
-            raise ValueError("Table.join@direction must be 'inner', 'left', or 'right'")
+            raise ValueError('Table.join@direction must be "inner", "left", or "right"')
 
         join = self.db.join(self, table, on=on, direction=direction, alias=alias)
 
@@ -623,15 +858,34 @@ class Table:
         return Table(self.db, join, columns)
 
     def select(
-        self, fields=None, where=None, limit: int = None, groupby=None, orderby=None
+        self,
+        fields: Union[str, Column, Iterable[Union[str, Column]]] = "all",
+        *,
+        where: Union[str, Column] = None,
+        limit: int = None,
+        groupby: Union[str, Column] = None,
+        orderby: Union[str, Column] = None,
+        **kwargs,
     ):
         """
         Runs a 'select' SQL query on the table.
-        @fields specifies what fields to select as 'all' or list(str).
-        @where specifies a condition to meet.
-        @limit specifies the maximum number of rows to return.
-        @groupby specifies what to group the data by
-        @orderby specifies what to order by.
+
+        Parameters
+        ----------
+        fields : str, Column, Iterable[str, Column], or "all"
+            the fields to select from the table
+        *
+        where : str, Column = None
+            a condition that needs to be met to be selected
+            Column with dtype in 'comparison', generated from performing a comparison on a Column
+        limit : int = None
+            the maximum number of rows to return
+        groupby : str, Column = None
+            the field to group the data by
+        orderby : str, Column = None
+            the field to order the data by
+        **kwargs
+            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
         """
         return self.db.query(
             "select",
@@ -641,12 +895,174 @@ class Table:
             limit=limit,
             groupby=groupby,
             orderby=orderby,
+            **kwargs,
         )
 
-    def update(self, fields=None, where=None):
+    def update(
+        self,
+        fields: Mapping[Union[str, Column], Any] = None,
+        where: Union[str, Column] = None,
+        **kwargs,
+    ):
         """
         Runs an 'update' SQL query on the table.
-        @fields specifies what values to update to as Mapping(field : value)
-        @where specifies a condition to meet.
+
+        Parameters
+        ----------
+        fields :  Mapping[Union[str,column], Any)
+            the values to update in the table
+        where : str, Column = None
+            a condition that needs to be met to be selected
+            Column with dtype in 'comparison', generated from performing a comparison on a Column
+        **kwargs
+            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
         """
-        return self.db.query("update", self.name, fields=fields, where=where)
+        return self.db.query("update", self.name, fields=fields, where=where, **kwargs)
+
+
+class AbstractConstraint(abc.ABC):
+    """
+    An object that represents a constraint in the database
+
+    Parameters
+    ----------
+    target : Column
+        the column to add this constraint to
+        appends itself to target.constraints
+
+    Properties
+    ----------
+    name : str
+        the name of this constraint
+        usually set by a child class via class._name
+    target : Column
+        the given target column
+
+    Methods
+    -------
+    *validate()
+        returns self unless a given value would be invalid to insert
+    """
+
+    def __init__(self, target: Column):
+        self._target = target
+        self._target._constraints.append(self)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def target(self) -> Column:
+        return self._target
+
+    @property
+    @abc.abstractmethod
+    def _name(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def validate(self, value: Any) -> "AbstractConstraint":
+        """
+        Provide some method of checking if a given value would be valid to insert under this constraint
+
+        Should return self or raise a ValueError
+        """
+        pass
+
+
+class Index(AbstractConstraint):
+    _name: str = "index"
+
+    def prepare(self) -> "Index":
+        all_keys = [
+            column.get_constraint("index") for column in self.target.table.columns
+        ]
+        results = self.target.table.select(
+            [c.target for c in all_keys if c is not None]
+        )
+
+        if not isinstance(results, Iterable) and all(
+            [isinstance(r, Mapping) and self.target.name in r for r in results]
+        ):
+            raise NotImplementedError(
+                f"Index.prepare is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.prepare to handle the return: {ret}"
+            )
+
+        self.values = {}
+        for r in results:
+            key = r.pop(self.target.name)
+            self.values[key] = r
+
+    def validate(self, value: Any) -> "Index":
+        if not hasattr(self, "values"):
+            self.prepare()
+        return self
+
+
+class Unique(AbstractConstraint):
+    _name: str = "unique"
+
+    def prepare(self) -> "Unique":
+        results = self.target.table.distinct(self.target)
+        if not isinstance(results, Iterable) and all(
+            [isinstance(r, Mapping) and self.target.name in r for r in results]
+        ):
+            raise NotImplementedError(
+                f"Index.prepare is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.prepare to handle the return: {ret}"
+            )
+        self.values = [r[self.target.name] for r in results]
+        return self
+
+    def validate(self, value: Any) -> "Unique":
+        if not hasattr(self, "values"):
+            self.prepare()
+        if value in self.values:
+            raise ValueError(f"{value} is not unique in {self.target}")
+        return self
+
+
+class Primary(Unique):
+    _name: str = "primary"
+
+    def __init__(self, target: Column):
+        if target.null:
+            raise ValueError(
+                f"A primary key may only be created if the target column is NOT NULL. target: {target}"
+            )
+        super().__init__(target)
+
+
+class ForeignKey(AbstractConstraint):
+    def __init__(self, target: Column, foreign: Column, name: str = ""):
+        if target.table == foreign.table:
+            raise ValueError(
+                f"Cannot foreign key a table on itself\ntarget: {target}\nforeign: {foreign}"
+            )
+        super().__init__(target)
+
+        self._foreign = foreign
+        self._foreign._constraints.append(self)
+
+        if not self.foreign.get_constraint("index"):
+            Index(foreign)
+        if name:
+            self._name = name
+
+    @property
+    def _name(self) -> str:
+        return f"fk_{self.target.table}_{self.target.name}"
+
+    @property
+    def foreign(self) -> Column:
+        return self._foreign
+
+    def prepare(self) -> "ForeignKey":
+        index = self.foreign.get_constraint("index")
+        index.prepare()
+        self.values = list(index.values.keys())
+
+    def validate(self, value: Any) -> "ForeignKey":
+        if not hasattr(self, "values"):
+            self.prepare()
+        return value in self.values
