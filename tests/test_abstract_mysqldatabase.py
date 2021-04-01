@@ -2,7 +2,13 @@ import pytest
 from pytest_mock import MockerFixture
 from typing import Any
 
-from pyframework import AbstractMySqlDatabase, AbstractMySqlTranslator, Column, Table
+from pyframework import (
+    AbstractMySqlDatabase,
+    AbstractMySqlTranslator,
+    Column,
+    Index,
+    Table,
+)
 
 
 class MockMySqlDB(AbstractMySqlDatabase):
@@ -373,6 +379,27 @@ def test_query_validation(mockdb: MockMySqlDB, mocker: MockerFixture):
     with pytest.raises(ValueError, match=r"@orderby must be a column in @table"):
         mockdb.query("select", "foo", "bar", orderby="baz")
 
+    mocker.patch.object(mockdb.foo, "_columns", [Column(mockdb.foo, "bar", "dtype")])
+    with pytest.raises(ValueError, match=r"must not contain multiple constraints"):
+        mockdb.query("add foreign index", "foo", "bar")
+
+    with pytest.raises(ValueError, match=r"must be a column in @table"):
+        mockdb.query("add foreign", "foo", 3)
+
+    with pytest.raises(ValueError, match="Cannot foreign key a table"):
+        mockdb.query(
+            "add foreign", "foo", "bar", foreign=Column(mockdb.foo, "foreign", "dtype")
+        )
+
+    with pytest.raises(TypeError, match="@name must be a str"):
+        mockdb.query("add index", "foo", "bar", name=3)
+
+    with pytest.raises(ValueError, match="@name cannot be over 64 characters"):
+        mockdb.query("add index", "foo", "bar", name="12345678" * 9)
+
+    with pytest.raises(TypeError, match="@fields must be an AbstractConstraint"):
+        mockdb.query("drop constraint", "foo", 3)
+
 
 def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
     tbl = Table(None, "table", [])
@@ -474,6 +501,31 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
     assert (
         mockdb.query("alter column", "table", "new_column", to=col)
         == "alter table 'table' change column 'new_column' 'new_altered' date;"
+    )
+
+    assert (
+        mockdb.query("add index", "table", "column")
+        == "alter table 'table' add constraint index (column);"
+    )
+
+    assert (
+        mockdb.query(
+            "add foreign",
+            "table",
+            "column",
+            foreign=mockdb.get_column("new_table", "column"),
+            name="fk_foobar",
+        )
+        == "alter table 'table' add constraint fk_foobar foreign key (column) references new_table (column);"
+    )
+
+    assert (
+        mockdb.query(
+            "drop constraint",
+            "table",
+            Index(mockdb.get_column("new_table", "column"), name="foo"),
+        )
+        == "alter table 'table' drop constraint foo;"
     )
 
     assert mockdb.query("truncate", "table") == "truncate table 'table';"

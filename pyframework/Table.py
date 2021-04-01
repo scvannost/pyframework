@@ -102,7 +102,7 @@ class Column:
         self._constraints = constraints
 
         if primary:
-            Primary(self)
+            PrimaryKey(self)
         elif unique:
             Unique(self)
         elif key:
@@ -631,96 +631,6 @@ class Table:
         """The constraints on all column of this table"""
         return [c for column in self.columns for c in column.constraints]
 
-    def add_foreign_key(self, col: Union[str, Column], foreign: Union[str, Column]):
-        """
-        Runs an 'alter table add foreign key' SQL query on the table
-
-        Parameters
-        ----------
-        col: str, Column
-            the column on which to add the key
-        foreign: str, Column = None
-            if given, the column to use as the foreign key
-            if @primary or @unique, calls them then returns result of foreign key
-        """
-        return self.db.query("add foreign", self, col, foreign=foreign)
-
-    def add_index(self, col: Union[str, Column], *, unique: bool = False):
-        """
-        Runs an 'alter table add [unique] index' SQL query on the table for the given column
-
-        Parameters
-        ----------
-        col: str, Column
-            the column on which to add the key
-        *
-        unique: bool = False
-            if True, make this a unique column
-        """
-        if unique:
-            return self.add_unique(col)
-        else:
-            Index(col)
-            return self.db.query("add index", self, col)
-
-    def add_key(
-        self,
-        col: Union[str, Column],
-        *,
-        primary: bool = False,
-        unique: bool = False,
-        foreign: Union[str, Column] = None,
-    ):
-        """
-        Runs an 'alter table add [primary / unique / foreign] key' SQL query on the table for the given column
-
-        Parameters
-        ----------
-        col: str, Column
-            the column on which to add the key
-        *
-        primary: bool = False
-            if True, make this a primary key
-            implies @unique = True as well
-        unique: bool = False
-            if True, make this a unique column
-        foreign: str, Column = None
-            if given, the column to use as the foreign key
-            if @primary or @unique, calls them then returns result of foreign key
-        """
-        if foreign is not None:
-            if primary or unique:
-                self.add_key(col, primary=primary, unique=unique)
-            return self.add_foreign_key(col, foreign)
-        elif primary:
-            return self.add_primary(col)
-        elif unique:
-            return self.add_unique(col)
-        else:
-            return self.add_index(col)
-
-    def add_primary_key(self, col: Union[str, Column]):
-        """
-        Runs an 'alter table add primary key' SQL query on the table
-
-        Parameters
-        ----------
-        col: str, Column
-            the column on which to add the key
-        """
-        return self.db.query("add primary", self, col)
-
-    def add_unique(self, col: Union[str, Column]):
-        """
-        Runs an 'alter table add unique' SQL query on the table
-
-        Parameters
-        ----------
-        col: str, Column
-            the column on which to add the key
-        """
-        return self.db.query("add unique", self, col)
-
     def get_column(self, col: Any) -> Any:
         """
         Returns the given col if it's in self.columns or col : str in self.column_names
@@ -740,6 +650,117 @@ class Table:
             ]
         else:
             return None
+
+    def add_foreign_key(
+        self, col: Union[str, Column], foreign: Union[str, Column], *, name: str = None
+    ):
+        """
+        Runs an 'alter table add foreign key' SQL query on the table
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        foreign: str, Column
+            the column to use as the foreign key
+        *
+        name: str = None
+            the name to use for the foreign key
+        """
+        ForeignKey(col, foreign, name=name)
+        return self.db.query("add foreign", self, col, foreign=foreign, name=name)
+
+    def add_index(
+        self, col: Union[str, Column], *, unique: bool = False, name: str = None
+    ):
+        """
+        Runs an 'alter table add [unique] index' SQL query on the table for the given column
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        *
+        unique: bool = False
+            if True, make this a unique column
+        name: str = None
+            the name to use for the index
+        """
+        if unique:
+            return self.add_unique(col, name=name)
+        else:
+            Index(col, name=name)
+            return self.db.query("add index", self, col, name=name)
+
+    def add_key(
+        self,
+        col: Union[str, Column],
+        *,
+        primary: bool = False,
+        unique: bool = False,
+        foreign: Union[str, Column] = None,
+        name: str = None,
+    ):
+        """
+        Runs an 'alter table add [primary / unique / foreign] key' SQL query on the table for the given column
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        *
+        primary: bool = False
+            if True, make this a primary key
+            implies @unique = True as well
+        unique: bool = False
+            if True, make this a unique column
+        foreign: str, Column = None
+            if given, the column to use as the foreign key
+            if @primary or @unique, calls them then returns result of foreign key
+        name: str = None
+            the name to use for the key
+            if @foreign and (@primary or @unique), used for the foreign key
+        """
+        if foreign is not None:
+            if primary or unique:
+                self.add_key(col, primary=primary, unique=unique)
+            return self.add_foreign_key(col, foreign, name=name)
+        elif primary:
+            return self.add_primary(col, name=name)
+        elif unique:
+            return self.add_unique(col, name=name)
+        else:
+            return self.add_index(col, name=name)
+
+    def add_primary_key(self, col: Union[str, Column], *, name: str = None):
+        """
+        Runs an 'alter table add primary key' SQL query on the table
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        *
+        name: str = None
+            the name to use for the index
+        """
+        PrimaryKey(col, name=name)
+        return self.db.query("add primary", self, col, name=name)
+
+    def add_unique(self, col: Union[str, Column], *, name: str = None):
+        """
+        Runs an 'alter table add unique' SQL query on the table
+
+        Parameters
+        ----------
+        col: str, Column
+            the column on which to add the key
+        *
+        name: str = None
+            the name to use for the index
+        """
+        Unique(col, name=name)
+        return self.db.query("add unique", self, col, name=name)
 
     def count(
         self,
@@ -816,6 +837,101 @@ class Table:
             orderby=orderby,
             **kwargs,
         )
+
+    def drop_foreign_key(self, foreign_key: "ForeignKey" = False):
+        """
+        Runs an 'alter table drop foreign key' SQL query on the table
+
+        Parameters
+        ----------
+        foreign_key: ForeignKey
+            the foreign key to drop
+        """
+        ret = self.db.query("drop constraint", self, foreign_key)
+        foreign_key.drop()
+        return ret
+
+    def drop_index(self, index: "Index", *, unique: bool = False):
+        """
+        Runs an 'alter table drop [unique] index' SQL query on the table for the given column
+
+        Parameters
+        ----------
+        index: Index
+            the index to drop
+        *
+        unique: bool = False
+            whether the key to drop is a unique key
+        """
+        if unique:
+            return self.drop_unique(index)
+        else:
+            ret = self.db.query("drop constraint", self, index)
+            index.drop()
+            return ret
+
+    def drop_key(
+        self,
+        key: "AbstractConstraint",
+        *,
+        primary: bool = False,
+        unique: bool = False,
+        foreign: Union[bool, str, Column] = False,
+    ):
+        """
+        Runs an 'alter table drop [primary / unique / foreign] key' SQL query on the table for the given column
+
+        Parameters
+        ----------
+        key: AbstractConstraint
+            the key to drop
+        *
+        primary: bool = False
+            whether the key to drop is a primary key
+            if True, implies @unique = True as well
+        unique: bool = False
+            whether the key to drop is a unique key
+        foreign: bool, str, Column = False
+            if bool, whether the key to drop is a foreign key
+            if not bool, the column the foreign key references
+            if @primary or @unique, calls them then returns result of foreign key
+        """
+        if foreign:
+            if primary or unique:
+                self.drop_key(key, primary=primary, unique=unique)
+            return self.drop_foreign_key(key)
+        elif primary:
+            return self.drop_primary(key)
+        elif unique:
+            return self.drop_unique(key)
+        else:
+            return self.drop_index(key)
+
+    def drop_primary_key(self, primary_key: "PrimaryKey"):
+        """
+        Runs an 'alter table drop primary key' SQL query on the table
+
+        Parameters
+        ----------
+        primary_key: PrimaryKey
+            the primary key to drop
+        """
+        ret = self.db.query("drop constraint", self, primary_key)
+        primary_key.drop()
+        return ret
+
+    def drop_unique(self, unique: "Unique"):
+        """
+        Runs an 'alter table drop unique' SQL query on the table
+
+        Parameters
+        ----------
+        unique: Unique
+            the unique constraint to drop
+        """
+        ret = self.db.query("drop constraint", self, unique)
+        unique.drop()
+        return ret
 
     def insert(self, fields: Mapping[Union[str, Column], Any], **kwargs):
         """
@@ -929,14 +1045,18 @@ class AbstractConstraint(abc.ABC):
     target : Column
         the column to add this constraint to
         appends itself to target.constraints
+    *
+
+    name : str
+        the name of this constraint
 
     Properties
     ----------
-    name : str
-        the name of this constraint
-        usually set by a child class via class._name
     target : Column
         the given target column
+    name : str
+        the name of this constraint
+        either given on __init__ or set by child class
 
     Methods
     -------
@@ -944,9 +1064,11 @@ class AbstractConstraint(abc.ABC):
         returns self unless a given value would be invalid to insert
     """
 
-    def __init__(self, target: Column):
+    def __init__(self, target: Column, *, name: str = ""):
         self._target = target
         self._target._constraints.append(self)
+        if name:
+            self._name = name
 
     @property
     def name(self) -> str:
@@ -956,11 +1078,6 @@ class AbstractConstraint(abc.ABC):
     def target(self) -> Column:
         return self._target
 
-    @property
-    @abc.abstractmethod
-    def _name(self) -> str:
-        pass
-
     @abc.abstractmethod
     def validate(self, value: Any) -> "AbstractConstraint":
         """
@@ -969,6 +1086,9 @@ class AbstractConstraint(abc.ABC):
         Should return self or raise a ValueError
         """
         pass
+
+    def drop(self):
+        self._target._constraints.pop(self._target._constraints.index(self))
 
 
 class Index(AbstractConstraint):
@@ -1022,7 +1142,7 @@ class Unique(AbstractConstraint):
         return self
 
 
-class Primary(Unique):
+class PrimaryKey(Unique):
     _name: str = "primary"
 
     def __init__(self, target: Column):
@@ -1039,19 +1159,19 @@ class ForeignKey(AbstractConstraint):
             raise ValueError(
                 f"Cannot foreign key a table on itself\ntarget: {target}\nforeign: {foreign}"
             )
-        super().__init__(target)
+
+        super().__init__(target, name=name)
 
         self._foreign = foreign
         self._foreign._constraints.append(self)
 
+        if not name or name == "":
+            self._name = (
+                f"fk_{self.target.table}_{self.target.name}_{self.foreign.name}"
+            )
+
         if not self.foreign.get_constraint("index"):
             Index(foreign)
-        if name:
-            self._name = name
-
-    @property
-    def _name(self) -> str:
-        return f"fk_{self.target.table}_{self.target.name}"
 
     @property
     def foreign(self) -> Column:

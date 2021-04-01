@@ -15,6 +15,7 @@ AbstractDatabase			  - AbstractTranslator
 """
 from .AbstractDatabase import AbstractDatabase, AbstractTranslator
 from .Table import Column, Table
+from .Table import ForeignKey, Index, PrimaryKey, Unique
 
 from .AbstractDatabase import AbstractSqlDatabase, AbstractSqlTranslator
 from .AbstractMySqlDatabase import AbstractMySqlDatabase, AbstractMySqlTranslator

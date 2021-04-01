@@ -6,7 +6,7 @@ from .AbstractDatabase import (
     AbstractSqlTranslator,
     AbstractTranslator,
 )
-from .Table import Column, Table
+from .Table import Column, Table, AbstractConstraint
 
 
 class AbstractMySqlDatabase(AbstractSqlDatabase):
@@ -112,58 +112,6 @@ class AbstractMySqlDatabase(AbstractSqlDatabase):
             Translator = AbstractMySqlTranslator
         super().__init__(*args, Translator=Translator, **kwargs)
 
-    def add_fk(
-        self, name: str, table: str, field: str, ref: str
-    ) -> "AbstractMySqlDatabase":
-        """
-        Adds a foreign key constraint
-
-        Parameters
-        ----------
-        name : str
-            the name of the fk
-        table : str
-            the name of the table
-        field : str
-            the name of the column
-        ref : str
-            the table and column that is the key
-            in the form: `table`(`col`)
-
-        Returns
-        -------
-        self
-        """
-        if not self.open:
-            raise Exception("You must initiate the connection.")
-
-        sql = "ALTER TABLE " + table + " ADD CONSTRAINT fk_" + name
-        sql += " FOREIGN KEY (" + field + ") REFERENCES " + ref + ";"
-        self.db_query(sql)
-        return self
-
-    def drop_fk(self, name: str, table: str) -> "AbstractMySqlDatabase":
-        """
-        Drop a foreign key constraint
-
-        Parameters
-        ----------
-        name : str
-            the name of the fk
-        table : str
-            the name of the table
-
-        Returns
-        -------
-        self
-        """
-        if not self.open:
-            raise Exception("You must initiate the connection.")
-
-        sql = "ALTER TABLE " + table + " DROP FOREIGN KEY fk_" + name + ";"
-        self.db_query(sql)
-        return self
-
 
 class AbstractMySqlTranslator(AbstractSqlTranslator):
     """
@@ -238,7 +186,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         str @method is the SQL method argument. Use 'distinct' for `select distinct`
             Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show', 'describe',
                        'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
-                       'rename table', 'truncate [table]', 'add/create column', 'drop column',
+                       'rename table', 'truncate [table]', 'add/create column', 'drop column', 'drop constraint',
                        'add foreign [key]', 'add index', 'add primary [key]', 'add unique [key / index]'
 
         Returns
@@ -266,6 +214,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             str,
             Column,
             Table,
+            AbstractConstraint,
         ] = None,
         *,
         where: Union[str, Column] = None,
@@ -297,6 +246,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             Must be a str for method = 'rename table'
             Must be str or Column for method in ['add column', 'drop column']
             Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
+            Must be an AbstractConstraint for @method = 'drop constraint'
             Must be a Iterable(col) or col or 'all' otherwise
         *
         col @where
@@ -543,7 +493,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                     "Database.query@fields must be 'all' or Iterable(col)."
                 )
 
-        elif "add" in method and any(
+        elif ("add" in method or "create" in method) and any(
             [i in method for i in ["foreign", "index", "primary", "unique"]]
         ):
             if (
@@ -570,10 +520,22 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
 
                 if isinstance(foreign, Column) and foreign.table == fields.table:
                     raise ValueError(
-                        f"Cannot foreign key a table on itself\ntarget: {target}\nforeign: {foreign}"
+                        f"Cannot foreign key a table on itself\ntarget: {fields}\nforeign: {foreign}"
                     )
 
-            raise NotImplementedError()
+            if "name" in kwargs:
+                name = kwargs.get("name", "")
+                if not isinstance(kwargs["name"], str):
+                    raise TypeError("Database.query@name must be a str if provided")
+                elif len(kwargs["name"]) > 64:
+                    raise ValueError("Database.query@name cannot be over 64 characters")
+
+        elif "drop" in method and "constraint" in method:
+            if not isinstance(fields, AbstractConstraint):
+                raise TypeError(
+                    'Database.query@fields must be an AbstractConstraint for @method="drop constraint"'
+                )
+            where, groupby, orderby, limit = None, None, None, None
 
         elif method == "delete":
             fields, groupby, orderby, limit = (
@@ -632,6 +594,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             str,
             Column,
             Table,
+            AbstractConstraint,
         ] = None,
         *,
         where: Union[str, Column] = None,
@@ -650,7 +613,8 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             Supported: 'select', 'delete', 'update', 'insert', 'distinct', 'count', 'show tables', 'describe',
                        'add/create [temporary] table [if not exists / clobber]', 'drop [temporary] tables',
                        'rename table', 'truncate [table]', 'add/create column', 'drop column', 'alter column',
-                       'add foreign [key]', 'add index', 'add primary [key]', 'add unique [key / index]'
+                       'add foreign [key]', 'add index', 'add primary [key]', 'add unique [key / index]',
+                       'drop constraint'
         str @table is the table name or the Table itself
             For @method = 'create table', must not be a Table or table name in this database
             Otherwise, must be a Table in self.tables or a str in self.table_names
@@ -662,6 +626,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             Must be a str for method = 'rename table'
             Must be str or Column for method in ['add column', 'drop column']
             Must be a str, Column, or Mapping[col, col] for @method = 'alter column'
+            Must be an AbstractConstraint for @method = 'drop constraint'
             Must be a Iterable(col) or col or 'all' otherwise
         *
         col @where
@@ -777,11 +742,14 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             if not isinstance(fields, Iterable):  # str is an Iterable
                 fields = [fields]
 
-        elif (
-            "add" in method and any(["foreign", "index", "primary", "unique"]) in method
+        elif ("add" in method or "create" in method) and any(
+            [i in method for i in ["foreign", "index", "primary", "unique"]]
         ):
             where, groupby, orderby, limit = None, None, None, None
             fields = table.get_column(fields)
+
+        elif "drop" in method and "constraint" in method:
+            where, groupby, orderby, limit = None, None, None, None
 
         elif method == "count":
             # TODO let count more things
@@ -871,7 +839,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
         elif "show" in method and "tables" in table:
             sql = "show tables"
 
-        elif "add" in method and any(
+        elif ("add" in method or "create" in method) and any(
             [i in method for i in ["foreign", "index", "primary", "unique"]]
         ):
             submethod = [
@@ -880,10 +848,19 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             if submethod in ["foreign", "primary"]:
                 submethod += " key"
 
-            sql = f"alter table {table!r} add constraint {submethod} ({fields!r}) "
+            if "name" in kwargs:
+                sql = f"alter table {table!r} add constraint {kwargs['name']} {submethod} ({fields.name})"
+            else:
+                sql = (
+                    f"alter table {table!r} add constraint {submethod} ({fields.name})"
+                )
 
-            if submethod == "foreign":
-                sql += f"references {kwargs['foreign']!r} "
+            if submethod == "foreign key":
+                foreign_table, foreign_field = repr(kwargs["foreign"]).split(".")
+                sql += f" references {foreign_table} ({foreign_field})"
+
+        elif "drop" in method and "constraint" in method:
+            sql = f"alter table {table!r} drop constraint {fields.name}"
 
         else:
             raise Exception(method)

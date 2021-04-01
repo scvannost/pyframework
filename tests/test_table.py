@@ -3,7 +3,7 @@ from pytest_mock import MockerFixture
 from typing import Any
 
 from pyframework import Column, Table
-from pyframework.Table import ForeignKey, Index, Primary, Unique
+from pyframework.Table import ForeignKey, Index, PrimaryKey, Unique
 
 
 def test_from_definition():
@@ -151,6 +151,13 @@ def test_table(mocker: MockerFixture):
         )
     )
 
+    constraint = mocker.Mock()
+    constraint.drop = mocker.MagicMock()
+    tbl.columns[0]._constraints.append(constraint)
+    tbl.drop_key(constraint)
+    assert tbl.db.query.called_with(mocker.call("drop constraint", fields=constraint))
+    assert constraint.drop.called_once()
+
 
 def test_constraints(mocker: MockerFixture):
     col = Column.from_definition("name dtype not null")
@@ -165,7 +172,7 @@ def test_constraints(mocker: MockerFixture):
     ]
     table.distinct = table.select
 
-    index = Index(col)
+    index = Index(col, name="foobar")
     mocker.patch.object(index.target, "_table", table)
     col = index.target
 
@@ -179,7 +186,7 @@ def test_constraints(mocker: MockerFixture):
     table.select.reset_mock()
     table.select.return_value = [{"name": "foo"}, {"name": "biz"}]
 
-    unique = Unique(col)
+    unique = Unique(col, name="foobar2")
     spy = mocker.spy(unique, "prepare")
     assert unique.validate(None) == unique
     spy.assert_called_once()
@@ -190,7 +197,7 @@ def test_constraints(mocker: MockerFixture):
         unique.validate("foo")
 
     with pytest.raises(ValueError, match="may only be created"):
-        Primary(col2)
+        PrimaryKey(col2)
 
     table.select.reset_mock()
     table.select.return_value = [
@@ -203,12 +210,14 @@ def test_constraints(mocker: MockerFixture):
     col2._constraints = []
     with pytest.raises(ValueError, match="table on itself"):
         ForeignKey(col, col)
-    fk = ForeignKey(col, col2)
+    fk = ForeignKey(col, col2, "foobar3")
     spy = mocker.spy(fk, "prepare")
     assert col2.get_constraint("index") is not None
 
     assert fk.validate("bar")
     spy.assert_called_once()
+
+    fk.drop()
 
 
 def test_get_constraint():
@@ -230,7 +239,7 @@ def test_get_constraint():
     assert index not in col.constraints
 
     index = Index(col)
-    primary = Primary(col)
+    primary = PrimaryKey(col)
     assert all([i in col.constraints for i in [unique, index, primary]])
     assert col.get_constraint("primary") == primary
     assert col.get_constraint("unique") == primary
@@ -241,5 +250,5 @@ def test_get_constraint():
     col2 = Column.from_definition("name2 dtype unique", table="Table2")
     fk = ForeignKey(col, col2)
     assert fk in col.constraints and primary in col.constraints
-    assert col.get_constraint("fk_None_name") == fk
+    assert col.get_constraint("fk_None_name_name2") == fk
     assert col.get_constraint(fk) == fk
