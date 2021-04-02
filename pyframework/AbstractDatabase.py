@@ -204,13 +204,6 @@ class AbstractDatabase(abc.ABC):
         else:
             return None
 
-    def interpret(self, results: Any, *args, **kwargs) -> Any:
-        """
-        Takes the results of self.db_query and the same args as self.translate
-        Returns the results in the correct format
-        """
-        return self.translator.interpret(results, *args, **kwargs)
-
     def is_valid_column(self, table: Any, column: Any, find_table: bool = True) -> bool:
         """
         Returns if column definition is valid in the current database for the given table
@@ -227,7 +220,7 @@ class AbstractDatabase(abc.ABC):
         Returns
         -------
         False
-            if @table is None, after self.get_talbe if @find_table
+            if @table is None, after self.get_table if @find_table
         bool
             self.translator.is_valid_column(table, column)
         """
@@ -259,27 +252,6 @@ class AbstractDatabase(abc.ABC):
         """
         self.close()
         return self.connect()
-
-    def translate(self, *args, **kwargs) -> str:
-        """
-        Translates the given call into code that can be executed by underlying database instance without validation
-        Use self.validate to see if a given call to this function will produce valid code
-        """
-        return self.translator.translate(*args, **kwargs)
-
-    def validate(self, *args, **kwargs) -> bool:
-        """
-        Takes the same args as self.translate
-        Returns true if they are a valid call
-        """
-        return self.translator.validate(*args, **kwargs)
-
-    def validate_and_raise(self, *args, **kwargs) -> None:
-        """
-        Takes the same args as self.translate
-        Raises an exception if there's any issues
-        """
-        return self.translator.validate_and_raise(*args, **kwargs)
 
     def add(self, a: Any, b: Any) -> Any:
         return self.translator.add(a, b)
@@ -411,7 +383,10 @@ class AbstractTranslator(abc.ABC):
             elif col.rsplit(" ", 1)[1] not in self.dtypes:
                 print("str dtype")
                 return False
-            elif table.get_column(col.rsplit(" ", 1)[0]) is None:
+            elif (
+                isinstance(table, Table)
+                and table.get_column(col.rsplit(" ", 1)[0]) is None
+            ):
                 return True
             else:
                 print()
@@ -423,7 +398,7 @@ class AbstractTranslator(abc.ABC):
             if col.dtype not in self.dtypes:
                 print("col dtype")
                 return False
-            elif table.get_column(col) is None:
+            elif isinstance(table, Table) and table.get_column(col) is None:
                 return True
             else:
                 print("col else")
@@ -1089,7 +1064,7 @@ class AbstractSqlDatabase(AbstractDatabase):
             only needed if @fields is not Mapping
         all additional kwargs passed through to self.[prepare / translate / db_query / interpret]
         """
-        self.validate_and_raise(
+        self.translator.validate_and_raise(
             method,
             table,
             fields,
@@ -1102,7 +1077,7 @@ class AbstractSqlDatabase(AbstractDatabase):
 
         # call db_query to get results
         results = self.db_query(
-            self.translate(
+            self.translator.translate(
                 method,
                 table,
                 fields,
@@ -1115,7 +1090,7 @@ class AbstractSqlDatabase(AbstractDatabase):
             **kwargs,
         )
 
-        return self.interpret(
+        return self.translator.interpret(
             results,
             method,
             table,

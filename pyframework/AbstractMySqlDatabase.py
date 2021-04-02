@@ -389,7 +389,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
 
                     used_names = []
                     for f in fields:
-                        if not self.is_valid_column(Table("", table, []), f):
+                        if not self.is_valid_column(Table("", "table", []), f):
                             raise ValueError(
                                 'Database.query@fields must be a str or Iterable(col) for @method="create table" unless @table is a Table'
                             )
