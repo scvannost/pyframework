@@ -406,12 +406,29 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
     tbl._columns.append(Column(tbl, "column", "int"))
 
     assert (
-        mockdb.query("create table", tbl)
+        mockdb.query(
+            "create table",
+            tbl,
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
         == "create table 'table' if not exists ('column' int);"
     )
     mockdb._tables.append(tbl)
     tbl._db = mockdb
-    assert mockdb.query("drop table", tbl) == "drop table 'table' if exists;"
+    assert (
+        mockdb.query(
+            "drop table",
+            tbl,
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
+        == "drop table 'table' if exists;"
+    )
     mockdb._tables = []
 
     assert (
@@ -432,20 +449,65 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
         == "create table 'table' if not exists (column int, new_column text);"
     )
     mockdb._tables.append(tbl)
-    assert mockdb.query("show", "tables") == "show tables;"
-    assert mockdb.query("describe", "table") == "describe 'table';"
+    assert (
+        mockdb.query(
+            "show",
+            "tables",
+            "foobar",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
+        == "show tables;"
+    )
+    assert (
+        mockdb.query(
+            "describe",
+            "table",
+            "foobar",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
+        == "describe 'table';"
+    )
 
     assert (
-        mockdb.query("insert", "table", {"column": "value1", "new_column": "value2"})
+        mockdb.query(
+            "insert",
+            "table",
+            {"column": "value1", "new_column": "value2"},
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
         == "insert into 'table' ('column', 'new_column') values (value1, value2);"
     )
     assert (
-        mockdb.query("update", "table", {"column": "new_value"})
+        mockdb.query(
+            "update",
+            "table",
+            {"column": "new_value"},
+            groupby="all",
+            orderby="these",
+            limit="ignored",
+        )
         == "update 'table' set 'column' = new_value;"
     )
 
     assert (
-        mockdb.query("rename table", "table", "new_name")
+        mockdb.query(
+            "rename table",
+            "table",
+            "new_name",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
         == "alter table 'table' rename 'new_name';"
     )
     mockdb._tables[0]._name = "new_name"
@@ -457,7 +519,15 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
 
     mockdb.tables[0]._columns = []
     assert (
-        mockdb.query("add column", "table", "column int")
+        mockdb.query(
+            "add column",
+            "table",
+            "column int",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
         == "alter table 'table' add column column int;"
     )
     mockdb.tables[0]._columns.append(Column(tbl, "column", "int"))
@@ -481,6 +551,10 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
         mockdb.query("select", "table", "all", where=(column < 0))
         == "select * from 'table' where (table.column < 0);"
     )
+    assert (
+        mockdb.query("select", "table", "all", limit=3)
+        == "select * from 'table' limit 3;"
+    )
 
     tbl2 = Table(mockdb, "new_table", [])
     tbl2._columns.append(Column(tbl2, "column", "int"))
@@ -495,7 +569,16 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
 
     col = Column(mockdb.get_table("table"), "new_altered", "date")
     assert (
-        mockdb.query("alter column", "table", "column", to="altered text")
+        mockdb.query(
+            "alter column",
+            "table",
+            "column",
+            to="altered text",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
         == "alter table 'table' change column 'column' altered text;"
     )
     assert (
@@ -504,7 +587,15 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
     )
 
     assert (
-        mockdb.query("add index", "table", "column")
+        mockdb.query(
+            "add index",
+            "table",
+            "column",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
         == "alter table 'table' add constraint index (column);"
     )
 
@@ -515,6 +606,10 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
             "column",
             foreign=mockdb.get_column("new_table", "column"),
             name="fk_foobar",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
         )
         == "alter table 'table' add constraint fk_foobar foreign key (column) references new_table (column);"
     )
@@ -528,10 +623,43 @@ def test_query_translate(mockdb: MockMySqlDB, mocker: MockerFixture):
         == "alter table 'table' drop constraint foo;"
     )
 
-    assert mockdb.query("truncate", "table") == "truncate table 'table';"
-    assert mockdb.query("delete", "table") == "delete from 'table';"
+    assert (
+        mockdb.query(
+            "truncate",
+            "table",
+            "foobar",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
+        == "truncate table 'table';"
+    )
+    assert (
+        mockdb.query(
+            "delete",
+            "table",
+            "foobar",
+            where=(column < 0),
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
+        == "delete from 'table' where (table.column < 0);"
+    )
 
-    assert mockdb.query("drop table", "table") == "drop table 'table' if exists;"
+    assert (
+        mockdb.query(
+            "drop table",
+            "table",
+            "foobar",
+            where="all",
+            groupby="of",
+            orderby="these",
+            limit="ignored",
+        )
+        == "drop table 'table' if exists;"
+    )
     mockdb._tables = []
 
     assert (

@@ -337,6 +337,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                     raise ValueError(
                         "Database.query@fields must be passed all required fields in @table for @method=insert"
                     )
+                where, groupby, orderby, limit = None, None, None, None
 
         elif method == "update":
             if not isinstance(fields, Mapping):
@@ -352,6 +353,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                     raise ValueError(
                         "Database.query@fields may only contains keys in @table.columns for @method=update"
                     )
+            groupby, orderby, limit = None, None, None
 
         elif "rename" in method and "table" in method:
             if fields is None and "to" in kwargs:  # needed for validation
@@ -365,6 +367,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                 raise ValueError(
                     'Database.query@fields must not be an existing table for @method="rename table"'
                 )
+            where, groupby, orderby, limit = None, None, None, None
 
         elif "drop" in method and "column" in method:
             if not isinstance(fields, (str, Column)):
@@ -432,6 +435,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                 raise ValueError(
                     'Database.query@fields must be None for @method="create table" and @table is a Table'
                 )
+            where, groupby, orderby, limit = None, None, None, None
 
         elif ("add" in method or "create" in method) and "column" in method:
             if not self.is_valid_column(table, fields):
@@ -446,6 +450,7 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
                     raise ValueError(
                         'Database.query@after must be a column in the table or "first" if given'
                     )
+            where, groupby, orderby, limit = None, None, None, None
 
         elif "alter" in method and "column" in method:
             where, groupby, orderby, limit = None, None, None, None
@@ -755,11 +760,14 @@ class AbstractMySqlTranslator(AbstractSqlTranslator):
             # TODO let count more things
             fields, orderby, limit = "*", None, None
 
-        elif method in ["delete", "describe"]:
+        elif method == "delete":
             fields, orderby, groupby, limit = None, None, None, None
 
-        # elif 'show' in method and 'tables' in table:
-        # 	fields, orderby, groupby, limit = None, None, None, None
+        elif method == "describe":
+            fields, where, orderby, groupby, limit = None, None, None, None, None
+
+        elif "show" in method and "tables" in table:
+            fields, where, orderby, groupby, limit = None, None, None, None, None
 
         # build the query
         if method in ["select", "distinct", "count"]:
