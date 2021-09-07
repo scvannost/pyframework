@@ -2,9 +2,11 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pyframework import (
-    AbstractMySqlDatabase,
     MysqldbDatabase,
     MysqldbTranslator,
+)
+from pyframework.core import (
+    AbstractMySqlDatabase,
     Column,
     Table,
 )

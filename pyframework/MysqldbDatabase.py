@@ -1,8 +1,8 @@
 from typing import Any, Dict, Iterable, List, Mapping, Tuple, Type, Union
 
-from .AbstractDatabase import AbstractTranslator
-from .AbstractMySqlDatabase import AbstractMySqlDatabase, AbstractMySqlTranslator
-from .Table import Column, Table
+from .core.AbstractDatabase import AbstractTranslator
+from .core.AbstractMySqlDatabase import AbstractMySqlDatabase, AbstractMySqlTranslator
+from .core.Table import Column, Table
 
 import MySQLdb
 

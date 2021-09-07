@@ -2,8 +2,7 @@ import pytest
 from pytest_mock import MockerFixture
 from typing import Any
 
-from pyframework import Column, Table
-from pyframework.Table import ForeignKey, Index, PrimaryKey, Unique
+from pyframework.core import Column, ForeignKey, Index, PrimaryKey, Table, Unique
 
 
 def test_from_definition():
