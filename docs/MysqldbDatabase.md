@@ -59,6 +59,7 @@ uses `self.get_table(table).set_column(column)`
 gets the given table gracefully
 if `table` in `self.tables` or `table.db == self`, returns `table` directly
 if `table` in `self.table_names`, gets from `self.tables` by index
+else returns `None`
 
 ### MysqldbTranslator.interpret(self, results, *args, **kwargs)
 takes the response from `self.db_query` and turns it into the desired python types

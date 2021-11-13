@@ -779,7 +779,7 @@ class Table:
         groupby : str, Column = None
             the field to group the data by
         **kwargs
-            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
+            passed to self.db.query, and onwards to self.db.[validate_and_raise / translate / db_query / interpret]
         """
         return self.db.query("count", self.name, where=where, groupby=groupby, **kwargs)
 
@@ -793,7 +793,7 @@ class Table:
             a condition that needs to be met to be selected
             Column with dtype in 'comparison', generated from performing a comparison on a Column
         **kwargs
-            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
+            passed to self.db.query, and onwards to self.db.[validate_and_raise / translate / db_query / interpret]
         """
         return self.db.query("delete", self.name, where=where)
 
@@ -825,7 +825,7 @@ class Table:
         orderby : str, Column = None
             the field to order the data by
         **kwargs
-            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
+            passed to self.db.query, and onwards to self.db.[validate_and_raise / translate / db_query / interpret]
         """
         return self.db.query(
             "distinct",
@@ -942,7 +942,7 @@ class Table:
         fields : Mapping[Union[str, Column] : Any]
             what values to insert into the table
         **kwargs
-            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
+            passed to self.db.query, and onwards to self.db.[validate_and_raise / translate / db_query / interpret]
         """
         return self.db.query("insert", self.name, fields=fields, **kwargs)
 
@@ -1001,7 +1001,7 @@ class Table:
         orderby : str, Column = None
             the field to order the data by
         **kwargs
-            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
+            passed to self.db.query, and onwards to self.db.[validate_and_raise / translate / db_query / interpret]
         """
         return self.db.query(
             "select",
@@ -1016,7 +1016,7 @@ class Table:
 
     def update(
         self,
-        fields: Mapping[Union[str, Column], Any] = None,
+        fields: Mapping[Union[str, Column], Any],
         where: Union[str, Column] = None,
         **kwargs,
     ):
@@ -1025,13 +1025,13 @@ class Table:
 
         Parameters
         ----------
-        fields :  Mapping[Union[str,column], Any)
+        fields :  Mapping[Union[str,column], Any]
             the values to update in the table
         where : str, Column = None
             a condition that needs to be met to be selected
             Column with dtype in 'comparison', generated from performing a comparison on a Column
         **kwargs
-            passed to self.db.query, and onwards to self.db.[prepare / translate / db_query / interpret]
+            passed to self.db.query, and onwards to self.db.[validate_and_raise / translate / db_query / interpret]
         """
         return self.db.query("update", self.name, fields=fields, where=where, **kwargs)
 
@@ -1094,7 +1094,7 @@ class AbstractConstraint(abc.ABC):
 class Index(AbstractConstraint):
     _name: str = "index"
 
-    def prepare(self) -> "Index":
+    def validate_and_raise(self) -> "Index":
         all_keys = [
             column.get_constraint("index") for column in self.target.table.columns
         ]
@@ -1106,7 +1106,7 @@ class Index(AbstractConstraint):
             [isinstance(r, Mapping) and self.target.name in r for r in results]
         ):
             raise NotImplementedError(
-                f"Index.prepare is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.prepare to handle the return: {ret}"
+                f"Index.validate_and_raise is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.validate_and_raise to handle the return: {ret}"
             )
 
         self.values = {}
@@ -1116,27 +1116,27 @@ class Index(AbstractConstraint):
 
     def validate(self, value: Any) -> "Index":
         if not hasattr(self, "values"):
-            self.prepare()
+            self.validate_and_raise()
         return self
 
 
 class Unique(AbstractConstraint):
     _name: str = "unique"
 
-    def prepare(self) -> "Unique":
+    def validate_and_raise(self) -> "Unique":
         results = self.target.table.distinct(self.target)
         if not isinstance(results, Iterable) and all(
             [isinstance(r, Mapping) and self.target.name in r for r in results]
         ):
             raise NotImplementedError(
-                f"Index.prepare is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.prepare to handle the return: {ret}"
+                f"Index.validate_and_raise is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.validate_and_raise to handle the return: {ret}"
             )
-        self.values = [r[self.target.name] for r in results]
+        self.values = {r[self.target.name]: r for r in results}
         return self
 
     def validate(self, value: Any) -> "Unique":
         if not hasattr(self, "values"):
-            self.prepare()
+            self.validate_and_raise()
         if value in self.values:
             raise ValueError(f"{value} is not unique in {self.target}")
         return self
@@ -1170,19 +1170,19 @@ class ForeignKey(AbstractConstraint):
                 f"fk_{self.target.table}_{self.target.name}_{self.foreign.name}"
             )
 
-        if not self.foreign.get_constraint("index"):
+        if self.foreign.get_constraint("index") == "index":
             Index(foreign)
 
     @property
     def foreign(self) -> Column:
         return self._foreign
 
-    def prepare(self) -> "ForeignKey":
+    def validate_and_raise(self) -> "ForeignKey":
         index = self.foreign.get_constraint("index")
-        index.prepare()
+        index.validate_and_raise()
         self.values = list(index.values.keys())
 
     def validate(self, value: Any) -> "ForeignKey":
         if not hasattr(self, "values"):
-            self.prepare()
+            self.validate_and_raise()
         return value in self.values
