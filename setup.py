@@ -11,13 +11,16 @@ setup(
     author_email="scvannost@gmail.com",
     download_url="https://github.com/scvannost/pyframework/archive/v_0.1.tar.gz",
     url="https://scvannost.com",
-    packages=["pyframework"],
+    packages=[
+        "pyframework",
+        "pyframework.core",
+    ],
     python_requires=">=3.0",
     install_requires=[
-        "MySQLdb",
+        "mysqlclient",
         "passlib",
     ],
-    keywords=["DATABASE", "USER MANAGEMENT"],
+    keywords=["DATABASE"],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: MIT License",

@@ -1,2 +1,2 @@
-MySQLdb
+mysqlclient
 passlib

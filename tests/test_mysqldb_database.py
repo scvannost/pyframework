@@ -5,11 +5,7 @@ from pyframework import (
     MysqldbDatabase,
     MysqldbTranslator,
 )
-from pyframework.core import (
-    AbstractMySqlDatabase,
-    Column,
-    Table,
-)
+from pyframework.core import AbstractMySqlDatabase
 import MySQLdb
 
 

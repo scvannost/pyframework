@@ -1,6 +1,5 @@
 import abc
 import gc
-import os
 
 from typing import Any, Iterable, List, Mapping, Tuple, Type, Union
 
@@ -56,10 +55,8 @@ class AbstractDatabase(abc.ABC):
         takes the response from self.db_query and turns it into the desired python types
     is_valid_column()
         checks if column would be valid
-    prepare()
-        route to self.translator.prepare
     query(method, table, fields, extra, kwargs)
-        provides API for querying the database using self.prepare and self.translate and self.interpret
+        provides API for querying the database using self.validate and self.translate and self.interpret
     rollback()
         rolls back changes to the database
     reconnect()
@@ -108,7 +105,7 @@ class AbstractDatabase(abc.ABC):
     @property
     def open(self) -> bool:
         """Returns whether or not the db connection is open."""
-        return (not self.db is None) and bool(self.db.open)
+        return (self.db is not None) and bool(self.db.open)
 
     @property
     def tables(self) -> List[Any]:
@@ -378,10 +375,8 @@ class AbstractTranslator(abc.ABC):
         """
         if isinstance(col, str):
             if len(col.split(" ", 1)) < 2:
-                print("str len")
                 return False
             elif col.rsplit(" ", 1)[1] not in self.dtypes:
-                print("str dtype")
                 return False
             elif (
                 isinstance(table, Table)
@@ -389,22 +384,15 @@ class AbstractTranslator(abc.ABC):
             ):
                 return True
             else:
-                print()
-                print(table.columns)
-                print(table.get_column(col.rsplit(" ", 1)[0]))
-                print("str else")
                 return False
         elif hasattr(col, "dtype"):
             if col.dtype not in self.dtypes:
-                print("col dtype")
                 return False
             elif isinstance(table, Table) and table.get_column(col) is None:
                 return True
             else:
-                print("col else")
                 return False
         else:
-            print("else")
             return False
 
     @abc.abstractmethod
@@ -496,7 +484,7 @@ class AbstractTranslator(abc.ABC):
                                 quotes = ""
                             # if it's an open quote, start tracking
                             elif not quotes:
-                                quotes = tokens
+                                quotes = token
                             # don't care about it otherwise
                             else:
                                 pass
@@ -508,7 +496,7 @@ class AbstractTranslator(abc.ABC):
 
     def validate_and_raise(self, *args, **kwargs):
         """
-        Validates the given args and kwargs to see if it is in the correct format for self.prepare or class.prepare_and_raise
+        Validates the given args and kwargs to see if it is in the correct format for self.translate
 
         Parameters
         ----------
@@ -542,15 +530,15 @@ class AbstractTranslator(abc.ABC):
         Returns
         -------
         bool
-            True if args, kwargs do not raise any errors in class.prepare_and_raise
-            False if class.prepare_and_raise throws an error during validation
+            True if args, kwargs do not raise any errors in self.validate_and_raise
+            False if self.validate_and_raise throws an error during validation
 
         Raises
         ------
         None
         """
         try:
-            self.validate_and_raised(db, *args, **kwargs)
+            self.validate_and_raise(self.db, *args, **kwargs)
         except Exception:
             return False
         else:
@@ -665,10 +653,8 @@ class AbstractSqlDatabase(AbstractDatabase):
         takes the response from self.db_query and turns it into the desired python types
     is_valid_column()
         checks if column would be valid
-    prepare()
-        route to self.translator.prepare
     query(method, table, fields, extra, kwargs)
-        provides API for querying the database using self.prepare and self.translate and self.interpret
+        provides API for querying the database using self.validate and self.translate and self.interpret
     rollback()
         rolls back changes to the database
     reconnect()
@@ -786,7 +772,7 @@ class AbstractSqlDatabase(AbstractDatabase):
         if isinstance(table, Table):
             setattr(self, table.name, Table(self, table.name, columns))
             if table in self.tables:
-                del self._tables[self.tables.index(name)]
+                del self._tables[self.tables.index(table.name)]
             self._tables.append(getattr(self, table.name))
 
         else:
@@ -1011,7 +997,7 @@ class AbstractSqlDatabase(AbstractDatabase):
     ) -> Any:
         """
         Provides the API through which you can query the database without writing SQL code yourself
-        This function relies on self.prepare, self.translate, self.db_query, and self.interpret, which all are implemented by a subclass
+        This function relies on self.validate_and_raise, self.translate, self.db_query, and self.interpret, which all are implemented by a subclass
         Any new subclass of AbstractSqlDatabase should be written to provide the functionality below, at a minimum
         Expanded functionality can be handled via special kwargs that are otherwise silently ignored in other functions
 
@@ -1039,7 +1025,7 @@ class AbstractSqlDatabase(AbstractDatabase):
         int @limit
         col @groupby
         col @orderby
-        all args, listed kwargs passed through to self.[prepare / translate]
+        all args, listed kwargs passed through to self.[validate_and_raise / translate]
 
         Returns
         -------
@@ -1062,7 +1048,7 @@ class AbstractSqlDatabase(AbstractDatabase):
             for @method in ['alter column', 'rename table']
             the new column specification for the column
             only needed if @fields is not Mapping
-        all additional kwargs passed through to self.[prepare / translate / db_query / interpret]
+        all additional kwargs passed through to self.[validate_and_raise / translate / db_query / interpret]
         """
         self.translator.validate_and_raise(
             method,
@@ -1107,6 +1093,8 @@ class AbstractSqlDatabase(AbstractDatabase):
         Rolls back any changes to the db
         Returns self
         """
+        if not self.open:
+            Exception("You must initiate the connection.")
         self.db.rollback()
         return self
 

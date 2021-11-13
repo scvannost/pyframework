@@ -60,10 +60,8 @@ class MysqldbDatabase(AbstractMySqlDatabase):
             takes the response from self.db_query and turns it into the desired python types
     is_valid_column()
             checks if column would be valid
-    prepare()
-            route to self.translator.prepare
     query(method, table, fields, extra, kwargs)
-            provides API for querying the database using self.prepare and self.translate and self.interpret
+            provides API for querying the database using self.validate and self.translate and self.interpret
     rollback()
             rolls back changes to the database
     reconnect()
