@@ -129,8 +129,7 @@ see docstring for exact syntax
 ### Column.get_constraint(self, constraint)
 if `constraint` is one of `"index"`, `"primary"`, or `"unique"`:
 - returns the given constraint or None 
-  - primary relation is kept in preference to unique
-- if multiple matches, remove all but the returned instance
+- if multiple matches, print a warning
 otherwise, just returns its argument
 
 ## Pass-through Methods
@@ -171,6 +170,7 @@ returns `self` if `value` is valid, otherwise raises `ValueError`
 
 ### validate_and_raise(self)
 updates `self.values` with the existing values in the constraint
+raises `ValueError` if any existing values are invalid
 
 # SubClasses of AbstractConstraint
 ## Index

@@ -1,4 +1,5 @@
 import abc
+from collections import defaultdict
 from typing import Any, Iterable, List, Mapping, Union
 
 
@@ -296,8 +297,6 @@ class Column:
     def get_constraint(self, constraint: Union["AbstractConstraint", str]):
         """
         Returns the given constraint or None if it's in  ["unique", "primary", "index"]
-            if multiple match, removes all but the returned instance
-                a primary relation is kept in preference to unique
         Otherwise returns its argument
         """
         if isinstance(constraint, str) and constraint == "index":
@@ -308,26 +307,8 @@ class Column:
             if len(ret) == 0:
                 return None
             elif len(ret) > 1:
-                if any([c.name == "primary" for c in ret]):
-                    # if the first one isn't the primary, we need to put it there
-                    # this assures that primary is kept over any uniques or indexes
-                    # False is less than True, so sort by the inverse
-                    ret = sorted(ret, key=lambda x: x.name != "primary")
-                elif any([c.name == "unique" for c in ret]):
-                    # if there's no primary and the first one isn't the unique, we need to put it there
-                    # this assures that unique is kept over any indexes
-                    # False is less than True, so sort by the inverse
-                    ret = sorted(ret, key=lambda x: x.name != "unique")
-
-                # remove all of the repetitive ones except the first
-                # see the conditional sorting above to determine the overall effect
-                self._constraints = [
-                    c
-                    for c in self.constraints
-                    if c.name not in ["index", "unique", "primary"]
-                ] + ret[:1]
+                print(f"Found multiple matching constraints for {constraint} on {self}")
                 return ret[0]
-
             else:  # len(ret) == 1
                 return ret[0]
 
@@ -336,24 +317,11 @@ class Column:
 
             if len(ret) == 0:
                 return None
-            elif len(ret) > 1:
-                if (
-                    any([c.name == "primary" for c in ret])
-                    and not ret[0].name == "primary"
-                ):
-                    # if the first one isn't the primary, we need to put it there
-                    # this assures that primary is kept over any uniques
-                    # False is less than True, so sort by the inverse
-                    ret = sorted(ret, key=lambda x: x.name != "primary")
+            else:  # len(ret) >= 1
+                if len(ret) > 1:
+                    print(f"Found multiple matching constraints for {constraint} on {self}:\n{ret}")
+                return ret[0]
 
-                # remove all of the repetitive ones except the first
-                # see the conditional sorting above to determine the overall effect
-                self._constraints = [
-                    c for c in self.constraints if c.name not in ["unique", "primary"]
-                ] + ret[:1]
-                return ret[0]
-            else:  # len(ret) == 1
-                return ret[0]
         elif isinstance(constraint, str) and any(
             [c.name == constraint for c in self.constraints]
         ):
@@ -361,15 +329,9 @@ class Column:
 
             if len(ret) == 0:
                 return None
-            elif len(ret) > 1:
-                # remove all of the repetitive ones except the first
-                # asserting that same name means redundant
-                # this can lead to unintended effects if different constraints have the same name
-                self._constraints = [
-                    c for c in self.constraints if c.name != constraint
-                ] + ret[:1]
-                return ret[0]
-            else:  # len(ret) == 1
+            else:  # len(ret) >= 1
+                if len(ret) > 1:
+                    print(f"Found multiple matching constraints for {constraint} on {self}:\n{ret}")
                 return ret[0]
 
         else:
@@ -1041,12 +1003,11 @@ class AbstractConstraint(abc.ABC):
     An object that represents a constraint in the database
 
     Parameters
+    target : Union[Column, List[Column]]
     ----------
-    target : Column
         the column to add this constraint to
         appends itself to target.constraints
     *
-
     name : str
         the name of this constraint
 
@@ -1057,16 +1018,27 @@ class AbstractConstraint(abc.ABC):
     name : str
         the name of this constraint
         either given on __init__ or set by child class
+    values : Mapping[Any, Any]
+        map of target value to the corresponding entry (primary, unique) or list of entries (foreign, index)
 
     Methods
     -------
     *validate()
         returns self unless a given value would be invalid to insert
+        raises ValueError otherwise
+    *validate_and_raise()
+        raises ValueError if any existing values break this constraint
+        sets self.values
     """
 
-    def __init__(self, target: Column, *, name: str = ""):
+    def __init__(self, target: Union[Column, List[Column]], *, name: str = ""):
         self._target = target
-        self._target._constraints.append(self)
+
+        if isinstance(target, Iterable):
+            [t._constraints.append(self) for t in self._target]
+        else:
+            self._target._constraints.append(self)
+
         if name:
             self._name = name
 
@@ -1075,7 +1047,7 @@ class AbstractConstraint(abc.ABC):
         return self._name
 
     @property
-    def target(self) -> Column:
+    def target(self) -> Union[Column, List[Column]]:
         return self._target
 
     @abc.abstractmethod
@@ -1086,37 +1058,50 @@ class AbstractConstraint(abc.ABC):
         Should return self or raise a ValueError
         """
         pass
+        
+    @abc.abstractmethod
+    def validate_and_raise(self, value: Any) -> "AbstractConstraint":
+        """
+        Provide some method of checking existing values are valid under this constraint
 
+        Should set self.values or raise a ValueError
+        """
+        pass
+    
     def drop(self):
-        self._target._constraints.pop(self._target._constraints.index(self))
+        if isinstance(self._target, Iterable):
+            [t._constraints.pop(self._target._constraints.index(self)) for t in self._target]
+        else:
+            self._target._constraints.pop(self._target._constraints.index(self))
 
 
 class Index(AbstractConstraint):
     _name: str = "index"
 
     def validate_and_raise(self) -> "Index":
-        all_keys = [
-            column.get_constraint("index") for column in self.target.table.columns
-        ]
-        results = self.target.table.select(
-            [c.target for c in all_keys if c is not None]
-        )
 
-        if not isinstance(results, Iterable) and all(
-            [isinstance(r, Mapping) and self.target.name in r for r in results]
-        ):
+        if isinstance(self.target, Iterable):
+            results = self.target[0].table.select("all")
+        else:
+            results = self.target.table.select("all")
+
+        if not isinstance(results, Iterable):
             raise NotImplementedError(
-                f"Index.validate_and_raise is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.validate_and_raise to handle the return: {ret}"
+                f"Index.validate_and_raise is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.validate_and_raise to handle the return: {results}"
             )
 
-        self.values = {}
+        self.values = defaultdict(list)
         for r in results:
-            key = r.pop(self.target.name)
-            self.values[key] = r
+            if isinstance(self.target, Iterable):
+                key = tuple([r[t.name] for t in self.target])
+            else:
+                key = r[self.target.name]
+            self.values[key].append(r)
+
+        self.values = dict(self.values)
 
     def validate(self, value: Any) -> "Index":
-        if not hasattr(self, "values"):
-            self.validate_and_raise()
+        self.validate_and_raise()
         return self
 
 
@@ -1124,22 +1109,40 @@ class Unique(AbstractConstraint):
     _name: str = "unique"
 
     def validate_and_raise(self) -> "Unique":
-        results = self.target.table.distinct(self.target)
+        results = self.target.table.select(self.target)
         if not isinstance(results, Iterable) and all(
             [isinstance(r, Mapping) and self.target.name in r for r in results]
         ):
             raise NotImplementedError(
-                f"Index.validate_and_raise is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.validate_and_raise to handle the return: {ret}"
+                f"Index.validate_and_raise is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement Index.validate_and_raise to handle the return: {results}"
             )
-        self.values = {r[self.target.name]: r for r in results}
+
+        self.values = {}
+        for r in results:
+            if isinstance(self.target, Iterable):
+                key = tuple([r[t.name] for t in self.target])
+            else:
+                key = r[self.target.name]
+
+            if key in self.values:
+                raise ValueError(f"Repeated existing value found in {self.target}\nBreaks unique constraint {self}")
+            else:
+                self.values[key] = r
         return self
 
     def validate(self, value: Any) -> "Unique":
-        if not hasattr(self, "values"):
-            self.validate_and_raise()
+        self.validate_and_raise()
+
+        if isinstance(self.target, Iterable):
+            if not isinstance(value, Iterable):
+                raise ValueError(f"{value} must be an iterable for {self.target}")
+            else:
+                value = tuple(value)
+
         if value in self.values:
             raise ValueError(f"{value} is not unique in {self.target}")
-        return self
+        else:
+            return self
 
 
 class PrimaryKey(Unique):
@@ -1170,19 +1173,39 @@ class ForeignKey(AbstractConstraint):
                 f"fk_{self.target.table}_{self.target.name}_{self.foreign.name}"
             )
 
-        if self.foreign.get_constraint("index") == "index":
-            Index(foreign)
+        self._foreign_index = self.foreign.get_constraint("index")
+        if not self._foreign_index:
+            self._foreign_index = Index(foreign)
 
     @property
     def foreign(self) -> Column:
         return self._foreign
+    
+    @property
+    def foreign_index(self) -> Column:
+        return self._foreign_index
 
     def validate_and_raise(self) -> "ForeignKey":
-        index = self.foreign.get_constraint("index")
-        index.validate_and_raise()
-        self.values = list(index.values.keys())
+        results = self.target.table.select(self.target)
+        if not isinstance(results, Iterable) and all(
+            [isinstance(r, Mapping) and self.target.name in r for r in results]
+        ):
+            raise NotImplementedError(
+                f"ForeignKey.validate_and_raise is only implemented when self.target.table.select returns Iterable[Mapping(self.target.name: <key>, ...)]\nPlease reimplement ForeignKey.validate_and_raise to handle the return: {results}"
+            )
+        self.foreign_index.validate_and_raise()
+
+        self.values = defaultdict(list)
+        for r in results:
+            if r[self.target.name] not in self.foreign_index.values:
+                raise ValueError(f"Not all existing values from {self.target} in {self.foreign}\nBreaks constraint {self}")
+            else:
+                self.values[r[self.target.name]].append(r)
+        self.values = dict(self.values)
 
     def validate(self, value: Any) -> "ForeignKey":
-        if not hasattr(self, "values"):
-            self.validate_and_raise()
-        return value in self.values
+        self.validate_and_raise()
+        if value in self.values:
+            return self
+        else:
+            raise ValueError(f"New {self.target} value {value} not found in foreign {self.foreign}")

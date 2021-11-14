@@ -140,12 +140,12 @@ def test_table(mocker: MockerFixture):
         )
     )
 
-    tbl.update()
+    tbl.update("foo")
     assert tbl.db.query.called_with(
         mocker.call(
             "update",
             "table",
-            fields=None,
+            fields="foo",
             where=None,
         )
     )
@@ -163,6 +163,7 @@ def test_constraints(mocker: MockerFixture):
     col2 = Column.from_definition("test dtype unique")
 
     table = mocker.Mock()
+    table.name = "table"
     table.columns = [col, col2]
     table.select = mocker.MagicMock()
     table.select.return_value = [
@@ -175,23 +176,23 @@ def test_constraints(mocker: MockerFixture):
     mocker.patch.object(index.target, "_table", table)
     col = index.target
 
-    spy = mocker.spy(index, "prepare")
+    spy = mocker.spy(index, "validate_and_raise")
     assert index.validate(None) == index
     spy.assert_called_once()
     assert table.select.called_with(mocker.call(["name", "test"]))
     assert hasattr(index, "values")
-    assert index.values == {"foo": {"test": "bar"}, "biz": {"test": "buz"}}
+    assert index.values == {"foo": [{"name":"foo", "test": "bar"}], "biz": [{"name":"biz", "test": "buz"}]}
 
     table.select.reset_mock()
     table.select.return_value = [{"name": "foo"}, {"name": "biz"}]
 
     unique = Unique(col, name="foobar2")
-    spy = mocker.spy(unique, "prepare")
+    spy = mocker.spy(unique, "validate_and_raise")
     assert unique.validate(None) == unique
     spy.assert_called_once()
     assert table.select.called_with(mocker.call("name"))
     assert hasattr(unique, "values")
-    assert unique.values == ["foo", "biz"]
+    assert unique.values == {"foo": {"name": "foo"}, "biz": {"name": "biz"}}
     with pytest.raises(ValueError, match="is not unique"):
         unique.validate("foo")
 
@@ -204,13 +205,18 @@ def test_constraints(mocker: MockerFixture):
         {"name": "biz", "test": "buz"},
     ]
     col2._table = table
-    col._table = None
+    col._table = mocker.Mock()
+    col._table.select.return_value = [
+        {"name": "bar", "test": "foo"},
+        {"name": "buz", "test": "biz"},
+    ]
 
     col2._constraints = []
     with pytest.raises(ValueError, match="table on itself"):
         ForeignKey(col, col)
     fk = ForeignKey(col, col2, "foobar3")
-    spy = mocker.spy(fk, "prepare")
+    spy = mocker.spy(fk, "validate_and_raise")
+    print(col2.get_constraint("index"))
     assert col2.get_constraint("index") is not None
 
     assert fk.validate("bar")
@@ -234,17 +240,13 @@ def test_get_constraint():
     unique = Unique(col)
     assert index in col.constraints and unique in col.constraints
     assert col.get_constraint("unique") == unique
-    assert col.get_constraint("index") == unique
-    assert index not in col.constraints
+    assert col.get_constraint("index") in (index, unique)
 
-    index = Index(col)
     primary = PrimaryKey(col)
     assert all([i in col.constraints for i in [unique, index, primary]])
-    assert col.get_constraint("primary") == primary
-    assert col.get_constraint("unique") == primary
-    assert unique not in col.constraints
-    assert col.get_constraint("index") == primary
-    assert index not in col.constraints
+    assert col.get_constraint("primary") in (primary, unique)
+    assert col.get_constraint("unique") in (primary, unique)
+    assert col.get_constraint("index") in (index, primary, unique)
 
     col2 = Column.from_definition("name2 dtype unique", table="Table2")
     fk = ForeignKey(col, col2)
